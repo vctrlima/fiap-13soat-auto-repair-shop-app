@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Status {
+  RECEIVED
+  IN_DIAGNOSIS
+  WAITING_APPROVAL
+  APPROVED
+  IN_EXECUTION
+  FINISHED
+  DELIVERED
+  CANCELED
+}
+
+enum UserRole {
+  ADMIN
+  DEFAULT
+}
+
+model Customer {
+  id        String    @id @default(uuid()) @db.Uuid
+  document  String    @unique @db.VarChar(14)
+  name      String    @db.VarChar(100)
+  email     String    @db.VarChar(100)
+  phone     String?   @db.VarChar(13)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
+
+  @@index([createdAt], map: "customer_created_at_idx")
+  @@index([updatedAt], map: "customer_updated_at_idx")
+}
+
+model Vehicle {
+  id           String    @id @default(uuid()) @db.Uuid
+  customerId   String    @map("customer_id") @db.Uuid
+  licensePlate String    @unique @map("license_plate") @db.VarChar(7)
+  brand        String    @db.VarChar(100)
+  model        String    @db.VarChar(100)
+  year         Int       @db.SmallInt
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime? @updatedAt @map("updated_at")
+
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  workOrders WorkOrder[]
+
+  @@index([createdAt], map: "vehicle_created_at_idx")
+  @@index([updatedAt], map: "vehicle_updated_at_idx")
+}
+
+model PartOrSupply {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique @db.VarChar(100)
+  description String?
+  price       Float
+  inStock     Int       @map("in_stock") @db.SmallInt
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  workOrderParts WorkOrderPartOrSupply[]
+
+  @@index([createdAt], map: "part_or_supply_created_at_idx")
+  @@index([updatedAt], map: "part_or_supply_updated_at_idx")
+}
+
+model Service {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique @db.VarChar(100)
+  description String?
+  price       Float
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  workOrderServices WorkOrderService[]
+  ServiceMetrics    ServiceMetrics[]
+
+  @@index([createdAt], map: "service_created_at_idx")
+  @@index([updatedAt], map: "service_updated_at_idx")
+}
+
+model WorkOrder {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  vehicleId  String    @map("vehicle_id") @db.Uuid
+  status     Status
+  budget     Float
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  parts          WorkOrderPartOrSupply[]
+  services       WorkOrderService[]
+  ServiceMetrics ServiceMetrics[]
+
+  @@index([status], map: "work_order_status_idx")
+  @@index([createdAt], map: "work_order_created_at_idx")
+  @@index([updatedAt], map: "work_order_updated_at_idx")
+}
+
+model WorkOrderPartOrSupply {
+  id             String   @id @default(uuid()) @db.Uuid
+  workOrderId    String   @map("work_order_id") @db.Uuid
+  partOrSupplyId String   @map("part_or_supply_id") @db.Uuid
+  quantity       Int      @db.SmallInt
+  price          Float
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
+  partOrSupply PartOrSupply @relation(fields: [partOrSupplyId], references: [id])
+
+  @@unique([workOrderId, partOrSupplyId], map: "work_order_part_or_supply_unique")
+  @@index([createdAt], map: "work_order_part_or_supply_created_at_idx")
+}
+
+model WorkOrderService {
+  id          String   @id @default(uuid()) @db.Uuid
+  workOrderId String   @map("work_order_id") @db.Uuid
+  serviceId   String   @map("service_id") @db.Uuid
+  price       Float
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  service   Service   @relation(fields: [serviceId], references: [id])
+
+  @@unique([workOrderId, serviceId], map: "work_order_service_unique")
+  @@index([price], map: "work_order_service_price_idx")
+  @@index([createdAt], map: "work_order_service_created_at_idx")
+}
+
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(100)
+  email     String    @unique @db.VarChar(100)
+  password  String
+  role      UserRole  @default(DEFAULT)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ServiceMetrics {
+  id          String    @id @default(uuid()) @db.Uuid
+  workOrderId String    @map("work_order_id") @db.Uuid
+  serviceId   String    @map("service_id") @db.Uuid
+  startedAt   DateTime  @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  service   Service   @relation(fields: [serviceId], references: [id])
+
+  @@unique([workOrderId, serviceId], map: "service_metrics_unique")
+  @@index([startedAt], map: "service_metrics_started_at_idx")
+  @@index([finishedAt], map: "service_metrics_finished_at_idx")
+}

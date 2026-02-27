@@ -1,0 +1,138 @@
+name: 'CD - Application'
+
+on:
+  workflow_run:
+    workflows: ['CI - Application']
+    branches: [main]
+    types:
+      - completed
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: 010526282303.dkr.ecr.us-east-2.amazonaws.com/vctrlima/fiap-13soat-techchallenge
+  EKS_CLUSTER_NAME: auto-repair-shop-cluster
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::010526282303:role/development
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::010526282303:role/development
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.0'
+          terraform_wrapper: false
+
+      - name: Read infrastructure outputs from remote state
+        id: infra
+        run: |
+          mkdir -p /tmp/tf-remote-state
+          cat > /tmp/tf-remote-state/main.tf <<'EOF'
+          data "terraform_remote_state" "k8s_infra" {
+            backend = "s3"
+            config = {
+              bucket = "auto-repair-shop-terraform-state"
+              key    = "k8s-infrastructure/terraform.tfstate"
+              region = "us-east-2"
+            }
+          }
+          output "target_group_arn"        { value = data.terraform_remote_state.k8s_infra.outputs.target_group_arn }
+          output "secrets_manager_role_arn" { value = data.terraform_remote_state.k8s_infra.outputs.secrets_manager_role_arn }
+          output "secrets_manager_name"     { value = data.terraform_remote_state.k8s_infra.outputs.secrets_manager_name }
+          output "alb_dns_name"             { value = data.terraform_remote_state.k8s_infra.outputs.alb_dns_name }
+          EOF
+          cd /tmp/tf-remote-state
+          terraform init
+          terraform apply -auto-approve > /dev/null
+          echo "TARGET_GROUP_ARN=$(terraform output -raw target_group_arn)" >> $GITHUB_OUTPUT
+          echo "SECRETS_ROLE_ARN=$(terraform output -raw secrets_manager_role_arn)" >> $GITHUB_OUTPUT
+          echo "SECRET_NAME=$(terraform output -raw secrets_manager_name)" >> $GITHUB_OUTPUT
+          echo "ALB_DNS=$(terraform output -raw alb_dns_name)" >> $GITHUB_OUTPUT
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.EKS_CLUSTER_NAME }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Prepare and deploy K8s manifests
+        run: |
+          # Replace placeholders
+          sed -i "s|\${ECR_REPOSITORY_URL}|${{ env.ECR_REPOSITORY }}|g" k8s/aws/deployment.yaml
+          sed -i "s|\${IMAGE_TAG}|${{ github.sha }}|g" k8s/aws/deployment.yaml
+          sed -i "s|\${TARGET_GROUP_ARN}|${{ steps.infra.outputs.TARGET_GROUP_ARN }}|g" k8s/aws/deployment.yaml
+          sed -i "s|\${SECRETS_MANAGER_ROLE_ARN}|${{ steps.infra.outputs.SECRETS_ROLE_ARN }}|g" k8s/aws/deployment.yaml
+          sed -i "s|\${AWS_SECRET_NAME}|${{ steps.infra.outputs.SECRET_NAME }}|g" k8s/aws/external-secrets.yaml
+
+          # Apply manifests
+          kubectl apply -f k8s/aws/deployment.yaml
+          kubectl apply --server-side -f k8s/aws/external-secrets.yaml
+
+          # Wait for ExternalSecret sync
+          kubectl wait --for=condition=Ready externalsecret/auto-repair-shop-secret \
+            --namespace auto-repair-shop --timeout=120s || true
+
+          # Restart deployment
+          kubectl rollout restart deployment/auto-repair-shop -n auto-repair-shop
+          kubectl rollout status deployment/auto-repair-shop \
+            --namespace auto-repair-shop --timeout=300s
+
+      - name: Health check
+        run: |
+          echo "Waiting for application to be ready..."
+          sleep 30
+          for i in {1..10}; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://${{ steps.infra.outputs.ALB_DNS }}/health" || echo "000")
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i/10 - Status: $HTTP_STATUS"
+            sleep 15
+          done
+          echo "Health check did not pass within expected time."
+          exit 0

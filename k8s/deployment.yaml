@@ -1,0 +1,191 @@
+# Deployment for Auto Repair Shop Application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auto-repair-shop
+  labels:
+    app: auto-repair-shop
+    tier: backend
+    environment: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auto-repair-shop
+      tier: backend
+  template:
+    metadata:
+      labels:
+        app: auto-repair-shop
+        tier: backend
+        environment: production
+    spec:
+      containers:
+        - name: auto-repair-shop
+          image: auto-repair-shop:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+              name: http
+          envFrom:
+            - configMapRef:
+                name: auto-repair-shop-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auto-repair-shop-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auto-repair-shop-secret
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: auto-repair-shop-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: auto-repair-shop-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: auto-repair-shop-config
+                  key: DB_NAME
+            - name: DATABASE_URL
+              value: 'postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?schema=public'
+            - name: JWT_ACCESS_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auto-repair-shop-secret
+                  key: JWT_ACCESS_TOKEN_SECRET
+            - name: JWT_REFRESH_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auto-repair-shop-secret
+                  key: JWT_REFRESH_TOKEN_SECRET
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: auto-repair-shop-secret
+                  key: SMTP_USERNAME
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auto-repair-shop-secret
+                  key: SMTP_PASSWORD
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30
+---
+# Deployment for PostgreSQL Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+    tier: database
+    environment: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: database
+        environment: production
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+              name: postgres
+          # Environment variables from Secret
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+# PersistentVolumeClaim for PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  labels:
+    app: postgres
+    tier: database
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # storageClassName: standard  # IMPORTANT: Uncomment for cloud providers

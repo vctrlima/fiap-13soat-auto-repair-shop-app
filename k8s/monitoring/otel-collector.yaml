@@ -1,0 +1,165 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: monitoring
+  labels:
+    app: otel-collector
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        send_batch_size: 1024
+        timeout: 5s
+      memory_limiter:
+        check_interval: 5s
+        limit_mib: 256
+        spike_limit_mib: 128
+      resource:
+        attributes:
+          - key: k8s.cluster.name
+            value: auto-repair-shop-cluster
+            action: upsert
+
+    exporters:
+      # Console exporter for debugging (disable in production)
+      debug:
+        verbosity: basic
+
+      # OTLP exporter — configure your backend (Grafana Cloud, Datadog, etc.)
+      # Uncomment and configure your preferred backend:
+      #
+      # otlphttp/grafana:
+      #   endpoint: https://otlp-gateway-prod-us-east-0.grafana.net/otlp
+      #   headers:
+      #     Authorization: "Basic <base64-encoded-credentials>"
+      #
+      # otlphttp/datadog:
+      #   endpoint: https://api.datadoghq.com
+      #
+      # awsxray:
+      #   region: us-east-2
+      #
+      # awscloudwatchlogs:
+      #   region: us-east-2
+      #   log_group_name: /ecs/auto-repair-shop
+      #   log_stream_name: otel
+
+      # Prometheus exporter for metrics scraping
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        namespace: auto_repair_shop
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      zpages:
+        endpoint: 0.0.0.0:55679
+
+    service:
+      extensions: [health_check, zpages]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [debug]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [debug, prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [debug]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: monitoring
+  labels:
+    app: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.115.0
+          args:
+            - --config=/etc/otel-collector/config.yaml
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8889
+              protocol: TCP
+            - name: health
+              containerPort: 13133
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otel-collector
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: monitoring
+  labels:
+    app: otel-collector
+spec:
+  type: ClusterIP
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+    - name: prometheus
+      port: 8889
+      targetPort: prometheus
+  selector:
+    app: otel-collector

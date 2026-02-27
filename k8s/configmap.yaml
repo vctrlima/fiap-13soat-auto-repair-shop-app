@@ -1,0 +1,34 @@
+# ConfigMap for Auto Repair Shop Application
+# Contains non-sensitive configuration variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auto-repair-shop-config
+  labels:
+    app: auto-repair-shop
+    tier: backend
+    environment: production
+data:
+  # Server Configuration
+  SERVER_HOST: 'http://0.0.0.0'
+  SERVER_PORT: '3000'
+  NODE_ENV: 'production'
+
+  # Database Configuration (non-sensitive)
+  DB_HOST: 'postgres-service'
+  DB_PORT: '5432'
+  DB_NAME: 'auto-repair-shop'
+
+  # Security Configuration
+  PASSWORD_HASH_SALT: '10'
+
+  # Mailing Configuration (disabled by default)
+  MAILING_ENABLED: 'true'
+  SMTP_HOST: 'sandbox.smtp.mailtrap.io'
+  SMTP_PORT: '587'
+
+  # Observability Configuration
+  OTEL_ENABLED: 'true'
+  OTEL_SERVICE_NAME: 'auto-repair-shop-api'
+  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel-collector.monitoring.svc.cluster.local:4318'
+  LOG_LEVEL: 'info'

@@ -1,0 +1,68 @@
+name: 'CI - Application'
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - run: yarn nx run auto-repair-shop:lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - run: yarn nx run auto-repair-shop:test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - run: yarn nx run auto-repair-shop:build
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - run: yarn nx run auto-repair-shop:typecheck
