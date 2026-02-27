@@ -1,7 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.json",
   "compilerOptions": {
-    "outDir": "out-tsc/@fiap-13soat-techchallenge/auto-repair-shop-e2e",
+    "outDir": "out-tsc",
     "esModuleInterop": true,
     "noUnusedLocals": false,
     "noImplicitAny": false

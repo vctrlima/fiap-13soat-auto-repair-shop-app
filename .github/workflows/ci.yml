@@ -1,10 +1,10 @@
-name: 'CI - Application'
+name: "CI - Application"
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: ['**']
+    branches: ["**"]
 
 permissions:
   actions: read
@@ -21,9 +21,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'yarn'
+          cache: "yarn"
       - run: yarn install --frozen-lockfile
-      - run: yarn nx run auto-repair-shop:lint
+      - run: yarn lint
 
   test:
     runs-on: ubuntu-latest
@@ -35,9 +35,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'yarn'
+          cache: "yarn"
       - run: yarn install --frozen-lockfile
-      - run: yarn nx run auto-repair-shop:test
+      - run: yarn test
 
   build:
     runs-on: ubuntu-latest
@@ -49,9 +49,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'yarn'
+          cache: "yarn"
       - run: yarn install --frozen-lockfile
-      - run: yarn nx run auto-repair-shop:build
+      - run: yarn build
 
   typecheck:
     runs-on: ubuntu-latest
@@ -63,6 +63,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'yarn'
+          cache: "yarn"
       - run: yarn install --frozen-lockfile
-      - run: yarn nx run auto-repair-shop:typecheck
+      - run: yarn typecheck

@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: auto-repair-shop-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: auto-repair-shop
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auto-repair-shop-app
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:admin@postgres:5432/auto-repair-shop?schema=public
+      SERVER_HOST: http://localhost:3000
+      SERVER_PORT: 3000
+      PASSWORD_HASH_SALT: 10
+      JWT_ACCESS_TOKEN_SECRET: 5b328d283d9a9982596057659c71e3a5
+      JWT_REFRESH_TOKEN_SECRET: 8b4e55de6e8b8401cfd56613f356c7cd
+      MAILING_ENABLED: "false"
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

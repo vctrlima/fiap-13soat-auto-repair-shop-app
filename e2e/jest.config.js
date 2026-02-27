@@ -1,19 +1,21 @@
-const { readFileSync } = require('fs');
+/* eslint-disable */
+const { readFileSync } = require("fs");
 
-const swcJestConfig = JSON.parse(readFileSync(`${__dirname}/.spec.swcrc`, 'utf-8'));
+const swcJestConfig = JSON.parse(
+  readFileSync(`${__dirname}/.spec.swcrc`, "utf-8"),
+);
 
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: '@fiap-13soat-techchallenge/auto-repair-shop-e2e',
-  preset: '../../jest.preset.js',
-  globalSetup: '<rootDir>/src/support/global-setup.ts',
-  globalTeardown: '<rootDir>/src/support/global-teardown.ts',
-  setupFiles: ['<rootDir>/src/support/test-setup.ts'],
-  testEnvironment: 'node',
+  displayName: "@fiap-13soat-techchallenge/auto-repair-shop-e2e",
+  globalSetup: "<rootDir>/src/support/global-setup.ts",
+  globalTeardown: "<rootDir>/src/support/global-teardown.ts",
+  setupFiles: ["<rootDir>/src/support/test-setup.ts"],
+  testEnvironment: "node",
   transform: {
-    '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
+    "^.+\\.[tj]s$": ["@swc/jest", swcJestConfig],
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: 'test-output/jest/coverage',
+  moduleFileExtensions: ["ts", "js", "html"],
+  coverageDirectory: "test-output/jest/coverage",
 };
