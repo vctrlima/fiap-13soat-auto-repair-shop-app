@@ -8,7 +8,7 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: "@fiap-13soat-techchallenge/auto-repair-shop-e2e",
+  displayName: "fiap-13soat-auto-repair-shop-app-e2e",
   globalSetup: "<rootDir>/src/support/global-setup.ts",
   globalTeardown: "<rootDir>/src/support/global-teardown.ts",
   setupFiles: ["<rootDir>/src/support/test-setup.ts"],
