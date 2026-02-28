@@ -9,7 +9,7 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: "fiap-13soat-auto-repair-shop-app",
+  displayName: "@fiap-13soat-auto-repair-shop/app",
   testEnvironment: "node",
   transform: {
     "^.+\\.[tj]s$": ["@swc/jest", swcJestConfig],
