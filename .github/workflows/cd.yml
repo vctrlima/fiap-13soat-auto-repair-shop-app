@@ -1,9 +1,9 @@
-name: 'CD - Application'
+name: "CD - Application"
 
 on:
   workflow_run:
-    workflows: ['CI - Application']
-    branches: [main]
+    workflows: ["CI - Application"]
+    branches: [main, staging]
     types:
       - completed
 
@@ -14,15 +14,44 @@ permissions:
 env:
   AWS_REGION: us-east-2
   ECR_REPOSITORY: 010526282303.dkr.ecr.us-east-2.amazonaws.com/vctrlima/fiap-13soat-techchallenge
-  EKS_CLUSTER_NAME: auto-repair-shop-cluster
 
 jobs:
-  build-and-push:
+  set-env:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      eks_cluster: ${{ steps.env.outputs.eks_cluster }}
+      tf_state_key: ${{ steps.env.outputs.tf_state_key }}
+      image_tag_prefix: ${{ steps.env.outputs.image_tag_prefix }}
+    steps:
+      - name: Determine environment from branch
+        id: env
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [ "$BRANCH" = "main" ]; then
+            echo "environment=production"       >> $GITHUB_OUTPUT
+            echo "eks_cluster=auto-repair-shop-cluster"  >> $GITHUB_OUTPUT
+            echo "tf_state_key=fiap-13soat-auto-repair-shop-k8s-production/terraform.tfstate" >> $GITHUB_OUTPUT
+            echo "image_tag_prefix=production"  >> $GITHUB_OUTPUT
+          elif [ "$BRANCH" = "staging" ]; then
+            echo "environment=staging"          >> $GITHUB_OUTPUT
+            echo "eks_cluster=auto-repair-shop-staging"  >> $GITHUB_OUTPUT
+            echo "tf_state_key=fiap-13soat-auto-repair-shop-k8s-staging/terraform.tfstate" >> $GITHUB_OUTPUT
+            echo "image_tag_prefix=staging"     >> $GITHUB_OUTPUT
+          else
+            echo "::error::Unsupported branch: $BRANCH"
+            exit 1
+          fi
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: set-env
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -43,17 +72,20 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-            ${{ env.ECR_REPOSITORY }}:latest
+            ${{ env.ECR_REPOSITORY }}:${{ needs.set-env.outputs.image_tag_prefix }}-${{ github.event.workflow_run.head_sha }}
+            ${{ env.ECR_REPOSITORY }}:${{ needs.set-env.outputs.image_tag_prefix }}-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs: [set-env, build-and-push]
+    environment: ${{ needs.set-env.outputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -64,19 +96,19 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.9.0'
+          terraform_version: "1.9.0"
           terraform_wrapper: false
 
       - name: Read infrastructure outputs from remote state
         id: infra
         run: |
           mkdir -p /tmp/tf-remote-state
-          cat > /tmp/tf-remote-state/main.tf <<'EOF'
+          cat > /tmp/tf-remote-state/main.tf <<EOF
           data "terraform_remote_state" "k8s_infra" {
             backend = "s3"
             config = {
               bucket = "auto-repair-shop-terraform-state"
-              key    = "k8s-infrastructure/terraform.tfstate"
+              key    = "${{ needs.set-env.outputs.tf_state_key }}"
               region = "us-east-2"
             }
           }
@@ -96,14 +128,16 @@ jobs:
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig \
-            --name ${{ env.EKS_CLUSTER_NAME }} \
+            --name ${{ needs.set-env.outputs.eks_cluster }} \
             --region ${{ env.AWS_REGION }}
 
       - name: Prepare and deploy K8s manifests
         run: |
+          IMAGE_TAG="${{ needs.set-env.outputs.image_tag_prefix }}-${{ github.event.workflow_run.head_sha }}"
+
           # Replace placeholders
           sed -i "s|\${ECR_REPOSITORY_URL}|${{ env.ECR_REPOSITORY }}|g" k8s/aws/deployment.yaml
-          sed -i "s|\${IMAGE_TAG}|${{ github.sha }}|g" k8s/aws/deployment.yaml
+          sed -i "s|\${IMAGE_TAG}|${IMAGE_TAG}|g" k8s/aws/deployment.yaml
           sed -i "s|\${TARGET_GROUP_ARN}|${{ steps.infra.outputs.TARGET_GROUP_ARN }}|g" k8s/aws/deployment.yaml
           sed -i "s|\${SECRETS_MANAGER_ROLE_ARN}|${{ steps.infra.outputs.SECRETS_ROLE_ARN }}|g" k8s/aws/deployment.yaml
           sed -i "s|\${AWS_SECRET_NAME}|${{ steps.infra.outputs.SECRET_NAME }}|g" k8s/aws/external-secrets.yaml
