@@ -2,7 +2,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/", "out-tsc/", "node_modules/", "test-output/"],
+    ignores: ["dist/", "out-tsc/", "node_modules/", "test-output/", "prisma/"],
   },
   ...tseslint.configs.recommended,
   {
@@ -20,6 +20,7 @@ export default tseslint.config(
         { argsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-namespace": "off",
     },
   },
 );
