@@ -1,0 +1,151 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerting-rules
+  namespace: monitoring
+  labels:
+    app: prometheus
+data:
+  alerting-rules.yaml: |
+    groups:
+      # =========================================================================
+      # API Health & Latency
+      # =========================================================================
+      - name: api-health
+        rules:
+          - alert: HighAPILatency
+            expr: histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le)) > 2000
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Alta latência nas APIs (p95 > 2s)"
+              description: "A latência do percentil 95 está acima de 2 segundos nos últimos 5 minutos."
+
+          - alert: CriticalAPILatency
+            expr: histogram_quantile(0.99, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le)) > 5000
+            for: 3m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Latência crítica nas APIs (p99 > 5s)"
+              description: "A latência do percentil 99 está acima de 5 segundos nos últimos 3 minutos."
+
+          - alert: HighErrorRate
+            expr: sum(rate(auto_repair_shop_http_server_request_count_total{status=~"5.."}[5m])) / sum(rate(auto_repair_shop_http_server_request_count_total[5m])) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Taxa de erros HTTP 5xx acima de 5%"
+              description: "Mais de 5% das requisições estão retornando erro 5xx nos últimos 5 minutos."
+
+          - alert: ApplicationDown
+            expr: up{job="auto-repair-shop-api"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Aplicação Auto Repair Shop está indisponível"
+              description: "O endpoint de health check não está respondendo há mais de 1 minuto."
+
+      # =========================================================================
+      # Work Order Processing
+      # =========================================================================
+      - name: work-order-processing
+        rules:
+          - alert: WorkOrderProcessingFailure
+            expr: increase(auto_repair_shop_db_query_error_count_total[15m]) > 10
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Falhas no processamento de ordens de serviço"
+              description: "Mais de 10 erros de banco de dados nos últimos 15 minutos, indicando possível falha no processamento de ordens de serviço."
+
+          - alert: NoWorkOrdersCreated
+            expr: increase(auto_repair_shop_business_work_order_created_total[24h]) == 0
+            for: 24h
+            labels:
+              severity: warning
+            annotations:
+              summary: "Nenhuma ordem de serviço criada nas últimas 24h"
+              description: "Nenhuma nova ordem de serviço foi criada nas últimas 24 horas durante horário comercial. Verificar se há problemas no sistema."
+
+          - alert: HighWorkOrderBacklog
+            expr: (auto_repair_shop_business_work_order_created_total - auto_repair_shop_business_work_order_completed_total) > 100
+            for: 30m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Backlog alto de ordens de serviço"
+              description: "Mais de 100 ordens de serviço pendentes de conclusão."
+
+      # =========================================================================
+      # Database Health
+      # =========================================================================
+      - name: database-health
+        rules:
+          - alert: HighDatabaseQueryLatency
+            expr: histogram_quantile(0.95, sum(rate(auto_repair_shop_db_query_duration_bucket[5m])) by (le)) > 1000
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Alta latência nas queries do banco (p95 > 1s)"
+              description: "Queries no banco de dados estão demorando mais de 1 segundo no percentil 95."
+
+          - alert: DatabaseQueryErrors
+            expr: rate(auto_repair_shop_db_query_error_count_total[5m]) > 0.5
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Erros frequentes nas queries do banco"
+              description: "Mais de 0.5 erros de banco por segundo nos últimos 5 minutos."
+
+      # =========================================================================
+      # Authentication
+      # =========================================================================
+      - name: authentication
+        rules:
+          - alert: HighLoginFailureRate
+            expr: increase(auto_repair_shop_business_auth_login_failure_total[1h]) > 50
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Alta taxa de falhas de login (>50/h)"
+              description: "Mais de 50 tentativas de login falharam na última hora. Possível ataque de brute force."
+
+      # =========================================================================
+      # Kubernetes Resources
+      # =========================================================================
+      - name: kubernetes-resources
+        rules:
+          - alert: HighCPUUsage
+            expr: avg(rate(container_cpu_usage_seconds_total{namespace="auto-repair-shop"}[5m])) by (pod) > 0.8
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Alto consumo de CPU no pod {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} está consumindo mais de 80% de CPU nos últimos 10 minutos."
+
+          - alert: HighMemoryUsage
+            expr: avg(container_memory_working_set_bytes{namespace="auto-repair-shop"}) by (pod) / avg(container_spec_memory_limit_bytes{namespace="auto-repair-shop"}) by (pod) > 0.85
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Alto consumo de memória no pod {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} está usando mais de 85% da memória limite nos últimos 10 minutos."
+
+          - alert: PodRestartLoop
+            expr: increase(kube_pod_container_status_restarts_total{namespace="auto-repair-shop"}[1h]) > 3
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod reiniciando frequentemente"
+              description: "Pod {{ $labels.pod }} reiniciou mais de 3 vezes na última hora."

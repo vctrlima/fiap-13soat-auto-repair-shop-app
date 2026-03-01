@@ -7,6 +7,16 @@ RESTful API for auto repair shop management, built with Fastify, Prisma and Post
 
 ---
 
+## Deploy Links
+
+| Environment | URL |
+| ----------- | --- |
+| **Production** | `https://api.auto-repair-shop.com` |
+| **Staging** | `https://staging-api.auto-repair-shop.com` |
+| **Swagger UI** | `https://api.auto-repair-shop.com/docs` |
+
+---
+
 ## Table of Contents
 
 - [Purpose](#purpose)
@@ -19,6 +29,7 @@ RESTful API for auto repair shop management, built with Fastify, Prisma and Post
 - [CI/CD](#cicd)
 - [Kubernetes](#kubernetes)
 - [Observability](#observability)
+- [Documentation](#documentation)
 - [Technical Notes](#technical-notes)
 - [Related Repositories](#related-repositories)
 
@@ -116,6 +127,91 @@ graph TD
 Request → Fastify Route → Adapter → Controller → Use Case → Repository → PostgreSQL
                               ↑           ↑            ↑
                          Middleware   Validator    Prisma Client
+```
+
+### Sequence Diagrams
+
+#### Authentication Flow (CPF)
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant APIGW as API Gateway
+    participant Lambda as Lambda (Auth)
+    participant RDS as RDS PostgreSQL
+
+    Client->>APIGW: POST /api/auth/cpf { cpf }
+    APIGW->>Lambda: Invoke (public route)
+    Lambda->>Lambda: Validate CPF format (11 digits)
+    Lambda->>Lambda: Validate CPF check digits
+    Lambda->>RDS: SELECT Customer WHERE document = $1
+    alt Customer found
+        RDS-->>Lambda: Customer { id, name, email, document }
+        Lambda->>Lambda: Sign JWT (sub, name, cpf, type, exp:15m)
+        Lambda-->>APIGW: 200 { accessToken, customer }
+        APIGW-->>Client: 200 { accessToken, customer }
+    else Customer not found
+        RDS-->>Lambda: Empty result
+        Lambda-->>APIGW: 404 { message: "Customer not found" }
+        APIGW-->>Client: 404
+    end
+
+    Note over Client,APIGW: Subsequent requests use JWT
+    Client->>APIGW: GET /api/* (Authorization: Bearer JWT)
+    APIGW->>APIGW: JWT Authorizer validates token
+    alt Token valid
+        APIGW->>Client: Forward to ALB → EKS
+    else Token invalid/expired
+        APIGW-->>Client: 401 Unauthorized
+    end
+```
+
+#### Work Order Creation Flow
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant APIGW as API Gateway
+    participant ALB as ALB
+    participant App as Fastify App (EKS)
+    participant DB as RDS PostgreSQL
+    participant Mail as SMTP (Nodemailer)
+    participant OTEL as OpenTelemetry
+
+    Client->>APIGW: POST /api/work-orders (Bearer JWT)
+    APIGW->>APIGW: JWT Authorizer validates token
+    APIGW->>ALB: Forward request
+    ALB->>App: Route to pod
+
+    App->>App: Auth Middleware extracts user from JWT
+    App->>App: Controller validates request body
+    App->>App: Validate customerId, vehicleId exist
+
+    App->>DB: BEGIN TRANSACTION
+    App->>DB: INSERT WorkOrder (status: OPEN)
+    App->>DB: INSERT WorkOrderService[] (foreach service)
+    App->>DB: INSERT WorkOrderPartOrSupply[] (foreach part)
+    App->>DB: COMMIT
+
+    App->>OTEL: Increment business.work_order.created
+    App->>OTEL: Record http.server.request.duration
+
+    App->>Mail: Send notification email (async)
+
+    App-->>ALB: 201 { workOrder }
+    ALB-->>APIGW: 201
+    APIGW-->>Client: 201 { workOrder }
+
+    Note over Client,DB: Status transitions
+    Client->>APIGW: PATCH /api/work-orders/:id/status
+    APIGW->>ALB: Forward (JWT valid)
+    ALB->>App: Route to pod
+    App->>DB: UPDATE WorkOrder SET status = $1
+    App->>OTEL: Record status transition time
+    alt Status = DONE/CLOSED
+        App->>OTEL: Increment business.work_order.completed
+    end
+    App-->>Client: 200 { workOrder }
 ```
 
 ### Data Model
@@ -524,8 +620,53 @@ Instrumentation with **OpenTelemetry** (enabled via `OTEL_ENABLED=true`):
 Manifests in `k8s/monitoring/` configure the **OpenTelemetry Collector** with:
 
 - OTLP receivers (gRPC :4317, HTTP :4318)
-- Exporters: debug + Prometheus
+- Exporters: Grafana Cloud (OTLP) + Prometheus + debug
 - Health check on port 13133
+
+### Dashboards (Grafana)
+
+Pre-configured dashboards in `k8s/monitoring/grafana-dashboards.yaml`:
+
+- **Overview Dashboard**: Volume diário de OS, latência (p50/p90/p99), taxa de requisições, erros de DB, falhas de login, uptime
+- **Work Orders Dashboard**: Tempo médio por status (Diagnóstico/Execução/Finalização), volume por dia, erros e falhas nas integrações
+
+### Alertas
+
+Regras de alerta em `k8s/monitoring/alerting-rules.yaml`:
+
+| Alerta | Severidade | Condição |
+| ------ | ---------- | -------- |
+| HighAPILatency | warning | p95 > 2s por 5min |
+| CriticalAPILatency | critical | p99 > 5s por 3min |
+| HighErrorRate | critical | 5xx > 5% por 5min |
+| ApplicationDown | critical | Health check down por 1min |
+| WorkOrderProcessingFailure | critical | >10 DB errors em 15min |
+| NoWorkOrdersCreated | warning | 0 OS em 24h |
+| HighDatabaseQueryLatency | warning | p95 > 1s por 5min |
+| DatabaseQueryErrors | critical | >0.5 erros/s por 5min |
+| HighLoginFailureRate | warning | >50 falhas/hora |
+| HighCPUUsage | warning | >80% por 10min |
+| HighMemoryUsage | warning | >85% por 10min |
+| PodRestartLoop | critical | >3 restarts/hora |
+
+---
+
+## Documentation
+
+- **Architecture Decision Records (ADRs)**: [`docs/adrs/`](docs/adrs/)
+  - [ADR-001: Padrão de Comunicação REST](docs/adrs/ADR-001-padrao-comunicacao-rest.md)
+- **Sequence Diagrams**: Included in this README ([Authentication Flow](#authentication-flow-cpf), [Work Order Creation](#work-order-creation-flow))
+- **ER Diagram**: Included in this README ([Data Model](#data-model))
+
+### Branch Protection
+
+All repositories follow these branch protection rules (configured in GitHub):
+
+- **Branch `main`**: protected — no direct pushes allowed
+- **Merge via Pull Request only**: all changes require a PR with at least 1 approval
+- **CI must pass**: status checks (lint, test, build, typecheck) must succeed before merge
+- **Branch `staging`**: used for homologation deployments, auto-deployed via CD pipeline
+- **Automatic deploys**: staging (on push to `staging`), production (on push to `main`)
 
 ---
 
