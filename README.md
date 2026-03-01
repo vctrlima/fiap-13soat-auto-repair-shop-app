@@ -1,56 +1,116 @@
-# Auto Repair Shop
+# Auto Repair Shop — API
 
-API RESTful para gerenciamento de oficina mecânica, construída com Fastify, Prisma e PostgreSQL, seguindo os princípios de Clean Architecture.
+RESTful API for auto repair shop management, built with Fastify, Prisma and PostgreSQL following Clean Architecture principles. Manages customers, vehicles, services, parts/supplies, work orders, users and JWT-based authentication.
+
+> **Part of the [Auto Repair Shop](https://github.com/fiap-13soat) ecosystem.**
+> Deploy order: **K8s Infra → Lambda → DB → App (this repo)**
 
 ---
 
-## Índice
+## Table of Contents
 
-- [Visão Geral](#visão-geral)
-- [Arquitetura](#arquitetura)
-- [Tecnologias](#tecnologias)
-- [Estrutura do Projeto](#estrutura-do-projeto)
-- [Configuração](#configuração)
-- [Executando a Aplicação](#executando-a-aplicação)
-- [API e Documentação](#api-e-documentação)
-- [Testes](#testes)
+- [Purpose](#purpose)
+- [Architecture](#architecture)
+- [Technologies](#technologies)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [API Documentation (Swagger)](#api-documentation-swagger)
+- [Testing](#testing)
 - [CI/CD](#cicd)
 - [Kubernetes](#kubernetes)
-- [Observabilidade](#observabilidade)
-- [Notas Técnicas](#notas-técnicas)
+- [Observability](#observability)
+- [Technical Notes](#technical-notes)
+- [Related Repositories](#related-repositories)
 
 ---
 
-## Visão Geral
+## Purpose
 
-Sistema de gerenciamento de oficina mecânica que oferece:
+Full-featured auto repair shop management system providing:
 
-- Cadastro e gestão de **clientes** (CPF/CNPJ)
-- Controle de **veículos** (placas brasileiras — modelo clássico e Mercosul)
-- Catálogo de **serviços** e **peças/suprimentos**
-- Gestão completa de **ordens de serviço** com fluxo de status (Recebida → Diagnóstico → Aguardando Aprovação → Aprovada → Em Execução → Finalizada → Entregue)
-- **Autenticação JWT** com access e refresh tokens
-- Gerenciamento de **usuários** com papéis (Admin / Default)
-- **Notificações por e-mail** para eventos de ordens de serviço
-- **Métricas de serviço** com tempo médio de execução
+- **Customer** registration and lookup (CPF/CNPJ validation)
+- **Vehicle** management (Brazilian license plate formats — classic & Mercosul)
+- **Service** and **Parts/Supplies** catalog
+- **Work Order** lifecycle (Received → Diagnosis → Waiting Approval → Approved → In Execution → Finished → Delivered)
+- **JWT authentication** with access & refresh tokens (user login + customer CPF auth via Lambda)
+- **User** management with roles (Admin / Default)
+- **Email notifications** for work order events
+- **Service metrics** tracking (average execution time)
 
 ---
 
-## Arquitetura
+## Architecture
 
-A aplicação segue **Clean Architecture**, separada em 5 camadas:
+### System Overview
 
+```mermaid
+graph LR
+    Client([Client])
+    APIGW[API Gateway]
+    Lambda[Lambda - CPF Auth]
+    ALB[ALB]
+    EKS[EKS Cluster]
+    App[Fastify App]
+    RDS[(RDS PostgreSQL)]
+
+    Client --> APIGW
+    APIGW -- "POST /api/auth/cpf" --> Lambda
+    APIGW -- "ANY /api/{proxy+}" --> ALB
+    APIGW -- "GET /health, /docs" --> ALB
+    Lambda --> RDS
+    ALB --> EKS
+    EKS --> App
+    App --> RDS
+
+    style App fill:#4da6ff,stroke:#0066cc,color:#fff
 ```
-src/
-├── domain/           # Entidades (interfaces), enums, tipos e contratos de use cases
-├── application/      # Implementações dos use cases e protocolos (interfaces para DB, crypto, messaging)
-├── infra/            # Implementações concretas: Prisma, bcrypt, JWT, Nodemailer, OpenTelemetry
-├── presentation/     # Controllers, middlewares de autenticação, erros HTTP
-├── validation/       # Validadores: e-mail, senha, documento (CPF/CNPJ), placa
-└── main/             # Composition root: rotas, factories, adapters, config, plugins, docs
+
+### Clean Architecture Layers
+
+The application follows **Clean Architecture**, organized in 5 layers:
+
+```mermaid
+graph TD
+    subgraph "Presentation Layer"
+        Routes[Fastify Routes]
+        Adapter[Route Adapter]
+        Controller[Controllers]
+        Middleware[Auth Middleware]
+    end
+
+    subgraph "Validation Layer"
+        Validators[Email / Password / Document / License Plate]
+    end
+
+    subgraph "Application Layer"
+        UseCases[Use Cases]
+        Protocols[Protocols - Interfaces]
+    end
+
+    subgraph "Domain Layer"
+        Entities[Entities / Enums / Types]
+    end
+
+    subgraph "Infrastructure Layer"
+        Prisma[Prisma ORM]
+        Bcrypt[Bcrypt]
+        JWT[JWT]
+        Mailer[Nodemailer]
+        OTEL[OpenTelemetry]
+    end
+
+    Routes --> Adapter --> Controller
+    Controller --> Validators
+    Controller --> UseCases
+    UseCases --> Protocols
+    Protocols --> Prisma
+    Protocols --> Bcrypt
+    Protocols --> JWT
+    Protocols --> Mailer
+    Middleware --> JWT
 ```
 
-### Fluxo de uma Requisição
+### Request Flow
 
 ```
 Request → Fastify Route → Adapter → Controller → Use Case → Repository → PostgreSQL
@@ -58,214 +118,282 @@ Request → Fastify Route → Adapter → Controller → Use Case → Repository
                          Middleware   Validator    Prisma Client
 ```
 
-### Modelo de Dados
+### Data Model
 
-```
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│   Customer   │──────▶│   Vehicle    │       │    User      │
-│  (CPF/CNPJ)  │       │ (licensePlate)│       │ (email/role) │
-└──────┬───────┘       └──────────────┘       └──────────────┘
-       │                      │
-       ▼                      ▼
-┌──────────────────────────────────────┐
-│            Work Order                │
-│  status: RECEIVED → ... → DELIVERED  │
-│  budget: calculado automaticamente   │
-├──────────────────┬───────────────────┤
-│ WorkOrderService │ WorkOrderPart     │
-│  (price, qty)    │  (price, qty)     │
-└────────┬─────────┴────────┬──────────┘
-         ▼                  ▼
-   ┌──────────┐     ┌──────────────┐
-   │ Service  │     │ PartOrSupply │
-   └──────────┘     └──────────────┘
+```mermaid
+erDiagram
+    Customer ||--o{ Vehicle : owns
+    Customer ||--o{ WorkOrder : requests
+    Vehicle ||--o{ WorkOrder : "is serviced in"
+    WorkOrder ||--o{ WorkOrderService : contains
+    WorkOrder ||--o{ WorkOrderPartOrSupply : contains
+    WorkOrder ||--o{ ServiceMetrics : tracks
+    WorkOrderService }o--|| Service : references
+    WorkOrderPartOrSupply }o--|| PartOrSupply : references
+    ServiceMetrics }o--|| Service : measures
+    User ||--o{ RefreshToken : has
 
-┌──────────────────┐     ┌──────────────┐
-│ ServiceMetrics   │     │ RefreshToken  │
-│ (tempo execução) │     │ (JWT refresh) │
-└──────────────────┘     └──────────────┘
+    Customer {
+        uuid id PK
+        string document UK
+        string name
+        string email
+        string phone
+    }
+
+    Vehicle {
+        uuid id PK
+        uuid customer_id FK
+        string license_plate UK
+        string brand
+        string model
+        int year
+    }
+
+    WorkOrder {
+        uuid id PK
+        uuid customer_id FK
+        uuid vehicle_id FK
+        Status status
+        float budget
+    }
+
+    Service {
+        uuid id PK
+        string name UK
+        string description
+        float price
+    }
+
+    PartOrSupply {
+        uuid id PK
+        string name UK
+        string description
+        float price
+        int in_stock
+    }
+
+    User {
+        uuid id PK
+        string name
+        string email UK
+        string password
+        UserRole role
+    }
+
+    RefreshToken {
+        uuid id PK
+        string token UK
+        datetime expires_at
+        uuid user_id FK
+    }
+
+    ServiceMetrics {
+        uuid id PK
+        uuid work_order_id FK
+        uuid service_id FK
+        datetime started_at
+        datetime finished_at
+    }
+
+    WorkOrderService {
+        uuid id PK
+        uuid work_order_id FK
+        uuid service_id FK
+        float price
+    }
+
+    WorkOrderPartOrSupply {
+        uuid id PK
+        uuid work_order_id FK
+        uuid part_or_supply_id FK
+        int quantity
+        float price
+    }
 ```
 
 ---
 
-## Tecnologias
+## Technologies
 
-| Tecnologia          | Versão | Uso                                |
-| ------------------- | ------ | ---------------------------------- |
-| **Node.js**         | 22     | Runtime                            |
-| **TypeScript**      | 5.9    | Linguagem                          |
-| **Fastify**         | 5.2    | Framework HTTP                     |
-| **Prisma**          | 6.8    | ORM e migrações                    |
-| **PostgreSQL**      | 16     | Banco de dados                     |
-| **Jest**            | 30     | Testes unitários e E2E             |
-| **Docker**          | —      | Containerização                    |
-| **GitHub Actions**  | —      | CI/CD                              |
-| **OpenTelemetry**   | —      | Traces, métricas e observabilidade |
-| **Swagger/OpenAPI** | 3.0    | Documentação da API                |
-| **Nodemailer**      | —      | Envio de e-mails                   |
+| Technology          | Version | Purpose                         |
+| ------------------- | ------- | ------------------------------- |
+| **Node.js**         | 22      | Runtime                         |
+| **TypeScript**      | 5.9     | Language                        |
+| **Fastify**         | 5.2     | HTTP framework                  |
+| **Prisma**          | 6.16    | ORM & migrations                |
+| **PostgreSQL**      | 16      | Database                        |
+| **Jest**            | 30      | Unit & E2E testing (with SWC)   |
+| **Docker**          | —       | Containerization (multi-stage)  |
+| **Kubernetes**      | —       | Orchestration (local + AWS EKS) |
+| **Terraform**       | —       | Local Minikube IaC              |
+| **GitHub Actions**  | —       | CI/CD pipelines                 |
+| **OpenTelemetry**   | —       | Distributed tracing & metrics   |
+| **Swagger/OpenAPI** | 3.0     | API documentation               |
+| **Nodemailer**      | —       | Email notifications             |
+| **Bcrypt**          | 6.0     | Password hashing                |
 
 ---
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
-├── .github/workflows/       # Pipelines CI/CD
-│   ├── ci.yml               # Integração contínua
-│   └── cd.yml               # Deploy contínuo (AWS EKS)
-├── e2e/                     # Testes end-to-end
+├── .github/workflows/       # CI/CD pipelines
+│   ├── ci.yml               # Continuous integration
+│   └── cd.yml               # Continuous deployment (AWS EKS)
+├── e2e/                     # End-to-end tests
 │   └── src/tests/           # Specs: auth, customers, vehicles, work-orders, etc.
-├── k8s/                     # Manifestos Kubernetes
+├── k8s/                     # Kubernetes manifests
 │   ├── deployment.yaml      # Deployments (app + PostgreSQL)
 │   ├── service.yaml         # Services (ClusterIP + NodePort)
-│   ├── configmap.yaml       # Configurações não sensíveis
-│   ├── secret.yaml          # Credenciais (base64)
+│   ├── configmap.yaml       # Non-sensitive config
+│   ├── secret.yaml          # Credentials (base64)
 │   ├── hpa.yaml             # Horizontal Pod Autoscaler
-│   ├── aws/                 # Manifestos específicos para AWS EKS
+│   ├── aws/                 # AWS EKS-specific manifests
 │   └── monitoring/          # OpenTelemetry Collector
-├── infra/                   # Terraform (ambiente local com Minikube)
+├── infra/                   # Terraform (local Minikube environment)
 │   └── main.tf
 ├── prisma/
-│   ├── schema.prisma        # Schema do banco de dados
-│   ├── migrations/          # Migrações SQL
-│   ├── seed.ts              # Seed de desenvolvimento
-│   └── seed-production.ts   # Seed de produção (admin user)
-├── src/                     # Código-fonte da aplicação
+│   ├── schema.prisma        # Database schema
+│   ├── migrations/          # SQL migrations
+│   ├── seed.ts              # Development seed
+│   └── seed-production.ts   # Production seed (admin user)
+├── src/                     # Application source code
 │   ├── main.ts              # Entry point
-│   ├── domain/              # Entidades e contratos
-│   ├── application/         # Implementações dos use cases
-│   ├── infra/               # Prisma, bcrypt, JWT, Nodemailer, OpenTelemetry
-│   ├── presentation/        # Controllers e middlewares HTTP
-│   ├── validation/          # Validadores de entrada
-│   └── main/                # Composição: rotas, factories, config, plugins
-├── Dockerfile               # Build multi-stage
-├── docker-compose.yml       # Ambiente Docker (app + PostgreSQL)
-├── docker-entrypoint.sh     # Migrations + seed + start
-└── .env.example             # Variáveis de ambiente
+│   ├── domain/              # Entities and contracts
+│   ├── application/         # Use case implementations
+│   ├── infra/               # Prisma, bcrypt, JWT, Nodemailer, OTEL
+│   ├── presentation/        # Controllers and HTTP middlewares
+│   ├── validation/          # Input validators
+│   └── main/                # Composition root: routes, factories, config, plugins
+├── Dockerfile               # Multi-stage build
+├── docker-compose.yml       # Docker environment (app + PostgreSQL)
+└── docker-entrypoint.sh     # Migrations + seed + start
 ```
 
 ---
 
-## Configuração
+## Getting Started
 
-### Variáveis de Ambiente
+### Prerequisites
 
-Copie o arquivo `.env.example` e ajuste conforme necessário:
+- Node.js 22 and Yarn 1.22+
+- Docker & Docker Compose (recommended)
+- PostgreSQL 16 (if running without Docker)
 
-```bash
-cp .env.example .env
-```
-
-| Variável                   | Descrição                             | Default                                                                     |
-| -------------------------- | ------------------------------------- | --------------------------------------------------------------------------- |
-| `DATABASE_URL`             | Connection string do PostgreSQL       | `postgresql://postgres:admin@localhost:5432/auto-repair-shop?schema=public` |
-| `SERVER_HOST`              | Host do servidor                      | `http://localhost:3000`                                                     |
-| `SERVER_PORT`              | Porta do servidor                     | `3000`                                                                      |
-| `PASSWORD_HASH_SALT`       | Rounds do bcrypt                      | `10`                                                                        |
-| `JWT_ACCESS_TOKEN_SECRET`  | Secret do access token JWT            | —                                                                           |
-| `JWT_REFRESH_TOKEN_SECRET` | Secret do refresh token JWT           | —                                                                           |
-| `MAILING_ENABLED`          | Habilitar envio de e-mails            | `true`                                                                      |
-| `SMTP_HOST`                | Host do servidor SMTP                 | —                                                                           |
-| `SMTP_PORT`                | Porta SMTP                            | `587`                                                                       |
-| `SMTP_USERNAME`            | Usuário SMTP                          | —                                                                           |
-| `SMTP_PASSWORD`            | Senha SMTP                            | —                                                                           |
-| `NODE_ENV`                 | Ambiente (`development`/`production`) | —                                                                           |
-
----
-
-## Executando a Aplicação
-
-### Com Docker (recomendado)
+### Running with Docker (recommended)
 
 ```bash
 docker compose up --build -d
 ```
 
-Isso sobe dois containers:
+This starts two containers:
 
-- **auto-repair-shop-db** — PostgreSQL 16 (porta 5432)
-- **auto-repair-shop-app** — Aplicação Node.js (porta 3000)
+- **auto-repair-shop-db** — PostgreSQL 16 (port 5432)
+- **auto-repair-shop-app** — Node.js application (port 3000)
 
-O entrypoint executa automaticamente:
+The entrypoint automatically runs:
 
-1. `prisma migrate deploy` — aplica as migrações
-2. `prisma seed-production.ts` — cria o usuário admin
-3. Inicia a aplicação
-
-Para acompanhar os logs:
+1. `prisma migrate deploy` — applies migrations
+2. `prisma seed-production.ts` — creates admin user
+3. Starts the application
 
 ```bash
+# Follow logs
 docker compose logs -f app
-```
 
-Para parar:
-
-```bash
+# Stop
 docker compose down
 ```
 
-### Desenvolvimento Local
-
-Requisitos: Node.js 22, Yarn 1.22+, PostgreSQL rodando localmente.
+### Local Development (without Docker)
 
 ```bash
-# Instalar dependências
+# Install dependencies
 yarn install
 
-# Gerar Prisma Client
+# Generate Prisma Client
 yarn prisma:generate
 
-# Aplicar migrações
+# Apply migrations
 yarn prisma:migrate
 
-# Seed do banco (cria admin: admin@email.com / @Abc1234)
+# Seed the database (creates admin: admin@email.com / @Abc1234)
 yarn prisma:seed
 
-# Iniciar em modo de desenvolvimento
+# Start in development mode (with hot-reload)
 yarn dev
 ```
 
-### Scripts Disponíveis
+### Environment Variables
 
-| Script                 | Comando                    | Descrição                      |
-| ---------------------- | -------------------------- | ------------------------------ |
-| `yarn build`           | `tsc -p tsconfig.app.json` | Compila TypeScript             |
-| `yarn start`           | `node ... dist/main.js`    | Inicia a aplicação             |
-| `yarn dev`             | `tsx watch src/main.ts`    | Desenvolvimento com hot-reload |
-| `yarn lint`            | `eslint .`                 | Verifica linting               |
-| `yarn test`            | `jest`                     | Testes unitários               |
-| `yarn test:e2e`        | `jest (e2e config)`        | Testes end-to-end              |
-| `yarn typecheck`       | `tsc --noEmit`             | Verificação de tipos           |
-| `yarn prisma:generate` | `prisma generate`          | Gera o Prisma Client           |
-| `yarn prisma:migrate`  | `prisma migrate dev`       | Aplica migrações (dev)         |
-| `yarn prisma:seed`     | `tsx prisma/seed.ts`       | Seed do banco de dados         |
+Copy `.env.example` to `.env` and configure:
+
+| Variable                   | Description                  | Default                                                                     |
+| -------------------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| `DATABASE_URL`             | PostgreSQL connection URL    | `postgresql://postgres:admin@localhost:5432/auto-repair-shop?schema=public` |
+| `SERVER_HOST`              | Server host                  | `http://localhost:3000`                                                     |
+| `SERVER_PORT`              | Server port                  | `3000`                                                                      |
+| `PASSWORD_HASH_SALT`       | Bcrypt rounds                | `10`                                                                        |
+| `JWT_ACCESS_TOKEN_SECRET`  | JWT access token secret      | —                                                                           |
+| `JWT_REFRESH_TOKEN_SECRET` | JWT refresh token secret     | —                                                                           |
+| `MAILING_ENABLED`          | Enable email sending         | `true`                                                                      |
+| `SMTP_HOST`                | SMTP server host             | —                                                                           |
+| `SMTP_PORT`                | SMTP port                    | `587`                                                                       |
+| `SMTP_USERNAME`            | SMTP username                | —                                                                           |
+| `SMTP_PASSWORD`            | SMTP password                | —                                                                           |
+| `NODE_ENV`                 | `development` / `production` | —                                                                           |
+
+### Available Scripts
+
+| Script                 | Command                    | Description                 |
+| ---------------------- | -------------------------- | --------------------------- |
+| `yarn build`           | `tsc -p tsconfig.app.json` | Compile TypeScript          |
+| `yarn start`           | `node ... dist/main.js`    | Start the application       |
+| `yarn dev`             | `tsx watch src/main.ts`    | Development with hot-reload |
+| `yarn lint`            | `eslint .`                 | Check code standards        |
+| `yarn test`            | `jest`                     | Run unit tests              |
+| `yarn test:e2e`        | `jest (e2e config)`        | Run end-to-end tests        |
+| `yarn typecheck`       | `tsc --noEmit`             | Type checking               |
+| `yarn prisma:generate` | `prisma generate`          | Generate Prisma Client      |
+| `yarn prisma:migrate`  | `prisma migrate dev`       | Apply migrations (dev)      |
+| `yarn prisma:seed`     | `tsx prisma/seed.ts`       | Seed the database           |
+
+### Deploy to AWS (EKS)
+
+Deployment to AWS is automated via GitHub Actions CD pipeline. See [CI/CD](#cicd) for details.
+
+For manual Kubernetes deployment, see [Kubernetes](#kubernetes).
 
 ---
 
-## API e Documentação
+## API Documentation (Swagger)
 
-A documentação Swagger UI está disponível em:
+Once the application is running, the **Swagger UI** is available at:
 
 ```
 http://localhost:3000/docs
 ```
 
-### Endpoints
+The API is documented with **OpenAPI 3.0** and includes all endpoints, schemas, and authentication requirements.
 
-| Recurso            | Prefixo                  | Operações                               |
-| ------------------ | ------------------------ | --------------------------------------- |
-| **Auth**           | `/api/auth`              | Login, Refresh Token                    |
-| **Customers**      | `/api/customers`         | CRUD + busca por documento              |
-| **Vehicles**       | `/api/vehicles`          | CRUD                                    |
-| **Services**       | `/api/services`          | CRUD                                    |
-| **Parts/Supplies** | `/api/parts-or-supplies` | CRUD                                    |
-| **Work Orders**    | `/api/work-orders`       | CRUD + aprovar + cancelar               |
-| **Users**          | `/api/users`             | CRUD                                    |
-| **Metrics**        | `/api/metrics`           | Consulta de métricas de serviço         |
-| **Health**         | `/health`                | Health check (status, uptime, recursos) |
+### Endpoints Overview
 
-### Autenticação
+| Resource           | Prefix                   | Operations                               |
+| ------------------ | ------------------------ | ---------------------------------------- |
+| **Auth**           | `/api/auth`              | Login, Refresh Token                     |
+| **Customers**      | `/api/customers`         | CRUD + search by document                |
+| **Vehicles**       | `/api/vehicles`          | CRUD                                     |
+| **Services**       | `/api/services`          | CRUD                                     |
+| **Parts/Supplies** | `/api/parts-or-supplies` | CRUD                                     |
+| **Work Orders**    | `/api/work-orders`       | CRUD + approve + cancel                  |
+| **Users**          | `/api/users`             | CRUD                                     |
+| **Metrics**        | `/api/metrics`           | Service metrics query                    |
+| **Health**         | `/health`                | Health check (status, uptime, resources) |
 
-A API usa **Bearer Token (JWT)**. Faça login para obter o token:
+### Authentication
+
+The API uses **Bearer Token (JWT)**. Login to obtain a token:
 
 ```bash
 curl -X POST http://localhost:3000/api/auth \
@@ -273,161 +401,171 @@ curl -X POST http://localhost:3000/api/auth \
   -d '{"email": "admin@email.com", "password": "@Abc1234"}'
 ```
 
-Use o `accessToken` retornado no header `Authorization: Bearer <token>`.
+Use the returned `accessToken` in the `Authorization: Bearer <token>` header.
 
 ---
 
-## Testes
+## Testing
 
-### Testes Unitários
+### Unit Tests
 
 ```bash
 yarn test
 ```
 
-- Framework: Jest 30 com SWC
-- Cobertura mínima: **80%** (branches, functions, lines, statements)
-- Saída de cobertura: `test-output/jest/coverage`
+- Framework: Jest 30 with SWC for fast compilation
+- Minimum coverage: **80%** (branches, functions, lines, statements)
+- Coverage output: `test-output/jest/coverage`
 
-### Testes End-to-End
+### End-to-End Tests
 
 ```bash
-# Com a aplicação rodando na porta 3000
+# With the application running on port 3000
 yarn test:e2e
 ```
 
-Os testes E2E cobrem todos os fluxos da API: autenticação, CRUD de clientes, veículos, serviços, peças, ordens de serviço e usuários.
+E2E tests cover all API flows: authentication, CRUD for customers, vehicles, services, parts, work orders, and users.
 
 ---
 
 ## CI/CD
 
-### CI — Integração Contínua (`.github/workflows/ci.yml`)
+### CI — Continuous Integration (`.github/workflows/ci.yml`)
 
-**Trigger:** push na branch `main` e pull requests em qualquer branch.
+**Trigger:** Push to `main` and pull requests on any branch.
 
-Executa **4 jobs em paralelo**:
+Runs **4 parallel jobs**:
 
-| Job         | Descrição                   |
-| ----------- | --------------------------- |
-| `lint`      | Verifica padrões de código  |
-| `test`      | Executa testes unitários    |
-| `build`     | Compila a aplicação         |
-| `typecheck` | Verifica tipagem TypeScript |
+| Job         | Description              |
+| ----------- | ------------------------ |
+| `lint`      | Code standards check     |
+| `test`      | Unit tests               |
+| `build`     | Application compilation  |
+| `typecheck` | TypeScript type checking |
 
-Todos os jobs usam Node.js 22 com cache do Yarn.
+All jobs use Node.js 22 with Yarn cache.
 
-### CD — Deploy Contínuo (`.github/workflows/cd.yml`)
+### CD — Continuous Deployment (`.github/workflows/cd.yml`)
 
-**Trigger:** execução bem-sucedida do CI na branch `main`.
+**Trigger:** Successful CI run on `main`.
 
-| Job              | Descrição                                                                                                                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build-and-push` | Autentica na AWS (OIDC), builda a imagem Docker com Buildx e pusha para o ECR com tags `$sha` e `latest`                                                                                |
-| `deploy`         | Lê outputs do Terraform (remote state no S3), atualiza kubeconfig do EKS, substitui placeholders nos manifestos K8s, aplica os manifestos, reinicia o deployment e executa health check |
-
-**Infraestrutura alvo:**
-
-- **ECR**: `010526282303.dkr.ecr.us-east-2.amazonaws.com/vctrlima/fiap-13soat-techchallenge`
-- **EKS**: cluster `auto-repair-shop-cluster` em `us-east-2`
+| Job              | Description                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| `build-and-push` | Authenticates to AWS (OIDC), builds Docker image with Buildx, pushes to ECR (`$sha` + `latest`) |
+| `deploy`         | Reads Terraform remote state, updates EKS kubeconfig, applies K8s manifests, health check       |
 
 ---
 
 ## Kubernetes
 
-### Manifestos Locais (`k8s/`)
+### Local Manifests (`k8s/`)
 
-Para deploy em cluster local (Minikube):
+For local cluster deployment (Minikube):
 
 ```bash
-# Aplicar todos os manifestos
+# Apply all manifests
 kubectl apply -f k8s/
 
-# Verificar pods
+# Check pods
 kubectl get pods
 
-# Acessar a aplicação
+# Access the application
 # Via NodePort: http://localhost:30080
 # Via port-forward: kubectl port-forward svc/auto-repair-shop-service 3000:80
 ```
 
-Recursos provisionados:
+Provisioned resources:
 
-- **Deployment** da aplicação (2 réplicas) com health probes em `/health`
-- **Deployment** do PostgreSQL (1 réplica) com PVC de 5Gi
-- **Services**: ClusterIP (porta 80) + NodePort (porta 30080)
-- **ConfigMap**: variáveis não sensíveis (host, porta, DB host)
-- **Secret**: credenciais de banco, JWT e SMTP (base64)
-- **HPA**: escala de 2 a 10 réplicas (CPU 70%, memória 80%)
+- **Deployment** — app (2 replicas) with health probes at `/health`
+- **Deployment** — PostgreSQL (1 replica) with 5Gi PVC
+- **Services** — ClusterIP (port 80) + NodePort (port 30080)
+- **ConfigMap** — non-sensitive variables
+- **Secret** — database, JWT and SMTP credentials (base64)
+- **HPA** — scales 2–10 replicas (CPU 70%, memory 80%)
 
-### Manifestos AWS (`k8s/aws/`)
+### AWS Manifests (`k8s/aws/`)
 
-Usados pelo pipeline de CD para deploy no EKS:
+Used by the CD pipeline for EKS deployment:
 
-- **deployment.yaml**: Namespace, ServiceAccount (IRSA), ConfigMap, Deployment, Service, TargetGroupBinding (ALB), HPA
-- **external-secrets.yaml**: SecretStore + ExternalSecret (AWS Secrets Manager)
+- **deployment.yaml** — Namespace, ServiceAccount (IRSA), ConfigMap, Deployment, Service, TargetGroupBinding (ALB), HPA
+- **external-secrets.yaml** — SecretStore + ExternalSecret (AWS Secrets Manager)
 
 ### Terraform (`infra/main.tf`)
 
-Provisiona um ambiente Kubernetes local via Minikube com todos os recursos necessários (namespace, deployments, services, HPA, secrets, PVC).
+Provisions a local Kubernetes environment via Minikube with all required resources (namespace, deployments, services, HPA, secrets, PVC).
 
 ---
 
-## Observabilidade
+## Observability
 
-A aplicação inclui instrumentação com **OpenTelemetry** (habilitada via `OTEL_ENABLED=true`):
+Instrumentation with **OpenTelemetry** (enabled via `OTEL_ENABLED=true`):
 
 ### Traces
 
-- Instrumentação automática de requisições HTTP (exclui `/health` e `/documentation`)
-- Trace ID e Span ID propagados nos logs para correlação
+- Automatic HTTP request instrumentation (excludes `/health` and `/documentation`)
+- Trace ID and Span ID propagated in logs for correlation
 
-### Métricas
+### Metrics
 
-- `http.server.request.count` — Contador de requisições HTTP
-- `http.server.request.duration` — Duração das requisições (histograma)
-- `business.work_order.created` — Ordens de serviço criadas
-- `business.work_order.completed` — Ordens de serviço finalizadas
-- `business.auth.login.count` — Logins realizados
-- `business.auth.login.failure` — Falhas de login
-- `business.customer.created` — Clientes criados
-- `db.query.duration` — Duração de queries no banco
-- `db.query.error.count` — Erros de query no banco
+| Metric                          | Type      | Description             |
+| ------------------------------- | --------- | ----------------------- |
+| `http.server.request.count`     | Counter   | HTTP requests count     |
+| `http.server.request.duration`  | Histogram | Request duration        |
+| `business.work_order.created`   | Counter   | Work orders created     |
+| `business.work_order.completed` | Counter   | Work orders completed   |
+| `business.auth.login.count`     | Counter   | Successful logins       |
+| `business.auth.login.failure`   | Counter   | Login failures          |
+| `business.customer.created`     | Counter   | Customers created       |
+| `db.query.duration`             | Histogram | Database query duration |
+| `db.query.error.count`          | Counter   | Database query errors   |
 
 ### Collector
 
-Os manifestos em `k8s/monitoring/` configuram o **OpenTelemetry Collector** com:
+Manifests in `k8s/monitoring/` configure the **OpenTelemetry Collector** with:
 
-- Receivers OTLP (gRPC :4317, HTTP :4318)
+- OTLP receivers (gRPC :4317, HTTP :4318)
 - Exporters: debug + Prometheus
-- Health check na porta 13133
+- Health check on port 13133
 
 ---
 
-## Notas Técnicas
+## Technical Notes
 
-### Ordem das Variáveis de Ambiente no Kubernetes
+### Kubernetes Environment Variable Order
 
-No manifesto de deployment, `DATABASE_URL` usa interpolação `$(VAR)` do Kubernetes. As variáveis referenciadas (`DB_USER`, `DB_PASSWORD`, `DB_HOST`, etc.) **devem ser definidas antes** de `DATABASE_URL`, caso contrário o Kubernetes usará o literal `$(DB_USER)` ao invés do valor real.
+In the deployment manifest, `DATABASE_URL` uses Kubernetes `$(VAR)` interpolation. Referenced variables (`DB_USER`, `DB_PASSWORD`, `DB_HOST`, etc.) **must be defined before** `DATABASE_URL`, otherwise Kubernetes will use the literal `$(DB_USER)` instead of the actual value.
 
 ### Path Aliases
 
-O projeto usa o alias `@/` para imports:
+The project uses the `@/` alias for imports:
 
 - **Compile-time** (tsconfig): `@/*` → `src/*`
 - **Runtime** (module-alias + tsconfig-paths): `@/*` → `dist/*`
 
-### Validações de Domínio
+### Domain Validations
 
-- **Documento de cliente**: CPF (11 dígitos com validação de dígito verificador) ou CNPJ (14 dígitos com validação)
-- **Placa de veículo**: formato clássico `ABC1234` ou Mercosul `ABC1D23`
-- **Senha**: mínimo uma letra maiúscula, um número e um caractere especial
-- **E-mail**: validação por regex
+- **Customer document**: CPF (11 digits with check digit validation) or CNPJ (14 digits with validation)
+- **Vehicle license plate**: classic format `ABC1234` or Mercosul `ABC1D23`
+- **Password**: minimum one uppercase letter, one number and one special character
+- **Email**: regex validation
 
-### Seed de Produção
+### Production Seed
 
-O Docker entrypoint cria automaticamente o usuário admin:
+The Docker entrypoint automatically creates the admin user:
 
 - **Email**: `admin@email.com`
-- **Senha**: `@Abc1234`
+- **Password**: `@Abc1234`
 - **Role**: `ADMIN`
+
+---
+
+## Related Repositories
+
+This project is part of the **Auto Repair Shop** ecosystem. Deploy in this order:
+
+| #   | Repository                                                                                                  | Description                                     |
+| --- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 1   | [`fiap-13soat-auto-repair-shop-k8s`](https://github.com/vctrlima/fiap-13soat-auto-repair-shop-k8s)       | AWS infrastructure (VPC, EKS, ALB, API Gateway) |
+| 2   | [`fiap-13soat-auto-repair-shop-lambda`](https://github.com/vctrlima/fiap-13soat-auto-repair-shop-lambda) | CPF authentication Lambda function              |
+| 3   | [`fiap-13soat-auto-repair-shop-db`](https://github.com/vctrlima/fiap-13soat-auto-repair-shop-db)         | Database infrastructure (RDS PostgreSQL)        |
+| 4   | **`fiap-13soat-auto-repair-shop-app`** (this repo)                                                          | Application API                                 |
