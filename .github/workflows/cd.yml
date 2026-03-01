@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: us-east-2
-  ECR_REPOSITORY: 010526282303.dkr.ecr.us-east-2.amazonaws.com/vctrlima/fiap-13soat-techchallenge
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/vctrlima/fiap-13soat-techchallenge
 
 jobs:
   set-env:
@@ -56,7 +56,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::010526282303:role/development
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/development
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -90,7 +90,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::010526282303:role/development
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/development
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -134,13 +134,16 @@ jobs:
       - name: Prepare and deploy K8s manifests
         run: |
           IMAGE_TAG="${{ needs.set-env.outputs.image_tag_prefix }}-${{ github.event.workflow_run.head_sha }}"
+          ENVIRONMENT="${{ needs.set-env.outputs.environment }}"
 
           # Replace placeholders
           sed -i "s|\${ECR_REPOSITORY_URL}|${{ env.ECR_REPOSITORY }}|g" k8s/aws/deployment.yaml
           sed -i "s|\${IMAGE_TAG}|${IMAGE_TAG}|g" k8s/aws/deployment.yaml
           sed -i "s|\${TARGET_GROUP_ARN}|${{ steps.infra.outputs.TARGET_GROUP_ARN }}|g" k8s/aws/deployment.yaml
           sed -i "s|\${SECRETS_MANAGER_ROLE_ARN}|${{ steps.infra.outputs.SECRETS_ROLE_ARN }}|g" k8s/aws/deployment.yaml
+          sed -i "s|\${ENVIRONMENT}|${ENVIRONMENT}|g" k8s/aws/deployment.yaml
           sed -i "s|\${AWS_SECRET_NAME}|${{ steps.infra.outputs.SECRET_NAME }}|g" k8s/aws/external-secrets.yaml
+          sed -i "s|\${ENVIRONMENT}|${ENVIRONMENT}|g" k8s/aws/external-secrets.yaml
 
           # Apply manifests
           kubectl apply -f k8s/aws/deployment.yaml
