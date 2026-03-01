@@ -5,7 +5,7 @@ metadata:
   name: auto-repair-shop
   labels:
     app: auto-repair-shop
-    environment: production
+    environment: ${ENVIRONMENT}
 
 ---
 apiVersion: v1
@@ -14,7 +14,7 @@ metadata:
   name: external-secrets-sa
   namespace: auto-repair-shop
   annotations:
-    eks.amazonaws.com/role-arn: '${SECRETS_MANAGER_ROLE_ARN}'
+    eks.amazonaws.com/role-arn: "${SECRETS_MANAGER_ROLE_ARN}"
   labels:
     app: auto-repair-shop
 
@@ -27,17 +27,23 @@ metadata:
   labels:
     app: auto-repair-shop
     tier: backend
-    environment: production
+    environment: ${ENVIRONMENT}
 data:
-  SERVER_HOST: 'http://0.0.0.0'
-  SERVER_PORT: '3000'
-  NODE_ENV: 'production'
+  SERVER_HOST: "http://0.0.0.0"
+  SERVER_PORT: "3000"
+  NODE_ENV: "${ENVIRONMENT}"
 
-  PASSWORD_HASH_SALT: '10'
+  PASSWORD_HASH_SALT: "10"
 
-  MAILING_ENABLED: 'true'
-  SMTP_HOST: 'sandbox.smtp.mailtrap.io'
-  SMTP_PORT: '587'
+  MAILING_ENABLED: "true"
+  SMTP_HOST: "sandbox.smtp.mailtrap.io"
+  SMTP_PORT: "587"
+
+  # Observability
+  OTEL_ENABLED: "true"
+  OTEL_SERVICE_NAME: "auto-repair-shop-api"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4318"
+  LOG_LEVEL: "info"
 
 ---
 apiVersion: apps/v1
@@ -48,7 +54,7 @@ metadata:
   labels:
     app: auto-repair-shop
     tier: backend
-    environment: production
+    environment: ${ENVIRONMENT}
 spec:
   replicas: 2
   strategy:
@@ -65,12 +71,12 @@ spec:
       labels:
         app: auto-repair-shop
         tier: backend
-        environment: production
+        environment: ${ENVIRONMENT}
     spec:
       serviceAccountName: external-secrets-sa
       containers:
         - name: auto-repair-shop
-          image: '${ECR_REPOSITORY_URL}:${IMAGE_TAG}'
+          image: "${ECR_REPOSITORY_URL}:${IMAGE_TAG}"
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -132,11 +138,11 @@ spec:
                   key: SMTP_PASSWORD
           resources:
             requests:
-              cpu: '100m'
-              memory: '256Mi'
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: '500m'
-              memory: '512Mi'
+              cpu: "500m"
+              memory: "512Mi"
           livenessProbe:
             httpGet:
               path: /health
@@ -164,7 +170,7 @@ metadata:
   labels:
     app: auto-repair-shop
     tier: backend
-    environment: production
+    environment: ${ENVIRONMENT}
 spec:
   type: ClusterIP
   selector:
@@ -188,7 +194,7 @@ spec:
   serviceRef:
     name: auto-repair-shop-service
     port: 80
-  targetGroupARN: '${TARGET_GROUP_ARN}'
+  targetGroupARN: "${TARGET_GROUP_ARN}"
   targetType: ip
 
 ---
@@ -200,7 +206,7 @@ metadata:
   labels:
     app: auto-repair-shop
     tier: backend
-    environment: production
+    environment: ${ENVIRONMENT}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
