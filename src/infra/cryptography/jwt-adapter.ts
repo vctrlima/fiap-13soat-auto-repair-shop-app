@@ -5,7 +5,11 @@ export class JwtAdapter implements Encrypter, Decrypter {
   async encrypt({ plainText, secret, jti, expiresIn = '30m' }: Encrypter.Params): Promise<string> {
     let payload: any = { id: plainText };
     if (jti) payload = { ...payload, jti };
-    return jwt.sign(payload, secret, { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] });
+    return jwt.sign(payload, secret, {
+      expiresIn: expiresIn as jwt.SignOptions['expiresIn'],
+      issuer: 'https://auto-repair-shop.auth',
+      audience: 'auto-repair-shop-api',
+    });
   }
 
   async decrypt({ cipherText, secret }: Decrypter.Params): Promise<string> {

@@ -1,5 +1,5 @@
-import { buildRoute } from '@/main/adapters';
-import { workOrderResponseSchema } from '@/main/docs';
+import { buildRoute } from "@/main/adapters";
+import { workOrderResponseSchema } from "@/main/docs";
 import {
   makeApproveWorkOrderController,
   makeCancelWorkOrderController,
@@ -8,472 +8,485 @@ import {
   makeGetAllWorkOrdersController,
   makeGetWorkOrderByIdController,
   makeUpdateWorkOrderController,
-} from '@/main/factories/controllers';
-import { authMiddleware, optionalAuthMiddleware } from '@/main/middlewares';
-import { FastifyInstance } from 'fastify';
+} from "@/main/factories/controllers";
+import {
+  authMiddleware,
+  customerOrUserAuthMiddleware,
+} from "@/main/middlewares";
+import { FastifyInstance } from "fastify";
 
 export default async function workOrderRoutes(fastify: FastifyInstance) {
   fastify.post(
-    '',
+    "",
     {
       preHandler: authMiddleware,
       schema: {
-        summary: 'Create Work Order',
+        summary: "Create Work Order",
         description:
-          'Creates a new work order for vehicle repair or maintenance. Work orders track the entire service process from receipt to delivery, including services performed, parts used, and current status.',
-        tags: ['work-order'],
+          "Creates a new work order for vehicle repair or maintenance. Work orders track the entire service process from receipt to delivery, including services performed, parts used, and current status.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         body: {
-          type: 'object',
-          description: 'Work order creation payload',
+          type: "object",
+          description: "Work order creation payload",
           properties: {
             customerId: {
-              type: 'string',
-              description: 'Unique identifier of the customer requesting the service',
-              format: 'uuid',
+              type: "string",
+              description:
+                "Unique identifier of the customer requesting the service",
+              format: "uuid",
             },
             vehicleId: {
-              type: 'string',
-              description: 'Unique identifier of the vehicle to be serviced',
-              format: 'uuid',
+              type: "string",
+              description: "Unique identifier of the vehicle to be serviced",
+              format: "uuid",
             },
             serviceIds: {
-              type: 'array',
-              items: { type: 'string', format: 'uuid' },
-              description: 'Array of service IDs to be performed on the vehicle',
+              type: "array",
+              items: { type: "string", format: "uuid" },
+              description:
+                "Array of service IDs to be performed on the vehicle",
             },
             partAndSupplyIds: {
-              type: 'array',
-              items: { type: 'string', format: 'uuid' },
-              description: 'Array of part/supply IDs that will be used (optional)',
+              type: "array",
+              items: { type: "string", format: "uuid" },
+              description:
+                "Array of part/supply IDs that will be used (optional)",
             },
             status: {
-              type: 'string',
+              type: "string",
               enum: [
-                'RECEIVED',
-                'IN_DIAGNOSIS',
-                'WAITING_APPROVAL',
-                'APPROVED',
-                'IN_EXECUTION',
-                'FINISHED',
-                'DELIVERED',
-                'CANCELED',
+                "RECEIVED",
+                "IN_DIAGNOSIS",
+                "WAITING_APPROVAL",
+                "APPROVED",
+                "IN_EXECUTION",
+                "FINISHED",
+                "DELIVERED",
+                "CANCELED",
               ],
-              default: 'RECEIVED',
-              description: 'Initial status of the work order (defaults to RECEIVED)',
+              default: "RECEIVED",
+              description:
+                "Initial status of the work order (defaults to RECEIVED)",
             },
           },
-          required: ['customerId', 'vehicleId'],
+          required: ["customerId", "vehicleId"],
         },
         response: {
           201: {
-            description: 'Work order created successfully',
+            description: "Work order created successfully",
             ...workOrderResponseSchema,
           },
           400: {
-            description: 'Bad Request',
-            type: 'object',
+            description: "Bad Request",
+            type: "object",
             properties: {
-              message: { type: 'string' },
+              message: { type: "string" },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeCreateWorkOrderController())
+    buildRoute(makeCreateWorkOrderController()),
   );
   fastify.get(
-    '',
+    "",
     {
       preHandler: authMiddleware,
       schema: {
-        summary: 'List Work Orders',
+        summary: "List Work Orders",
         description:
-          'Retrieves a paginated list of all work orders in the system. Supports comprehensive filtering by customer, vehicle, status, and budget range, with multiple sorting options for efficient work order management.',
-        tags: ['work-order'],
+          "Retrieves a paginated list of all work orders in the system. Supports comprehensive filtering by customer, vehicle, status, and budget range, with multiple sorting options for efficient work order management.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         querystring: {
-          type: 'object',
-          description: 'Query parameters for filtering, pagination, and sorting',
+          type: "object",
+          description:
+            "Query parameters for filtering, pagination, and sorting",
           properties: {
             page: {
-              type: 'number',
+              type: "number",
               default: 1,
               minimum: 1,
-              description: 'Page number for pagination',
+              description: "Page number for pagination",
             },
             limit: {
-              type: 'number',
+              type: "number",
               default: 10,
               minimum: 1,
               maximum: 100,
-              description: 'Number of items per page',
+              description: "Number of items per page",
             },
             orderBy: {
-              type: 'string',
-              enum: ['status', 'budget', 'createdAt'],
-              default: 'createdAt',
-              description: 'Field to sort by',
+              type: "string",
+              enum: ["status", "budget", "createdAt"],
+              default: "createdAt",
+              description: "Field to sort by",
             },
             orderDirection: {
-              type: 'string',
-              enum: ['asc', 'desc'],
-              default: 'asc',
-              description: 'Sort direction (ascending or descending)',
+              type: "string",
+              enum: ["asc", "desc"],
+              default: "asc",
+              description: "Sort direction (ascending or descending)",
             },
             customerId: {
-              type: 'string',
-              description: 'Filter by customer ID to show only their work orders',
+              type: "string",
+              description:
+                "Filter by customer ID to show only their work orders",
             },
             vehicleId: {
-              type: 'string',
-              description: 'Filter by vehicle ID to show only work orders for that vehicle',
+              type: "string",
+              description:
+                "Filter by vehicle ID to show only work orders for that vehicle",
             },
             status: {
-              type: 'string',
+              type: "string",
               enum: [
-                'RECEIVED',
-                'IN_DIAGNOSIS',
-                'WAITING_APPROVAL',
-                'APPROVED',
-                'IN_EXECUTION',
-                'FINISHED',
-                'DELIVERED',
-                'CANCELED',
+                "RECEIVED",
+                "IN_DIAGNOSIS",
+                "WAITING_APPROVAL",
+                "APPROVED",
+                "IN_EXECUTION",
+                "FINISHED",
+                "DELIVERED",
+                "CANCELED",
               ],
-              description: 'Filter by work order status',
+              description: "Filter by work order status",
             },
             minBudget: {
-              type: 'number',
+              type: "number",
               minimum: 0,
-              description: 'Filter by minimum budget amount',
+              description: "Filter by minimum budget amount",
             },
             maxBudget: {
-              type: 'number',
+              type: "number",
               minimum: 0,
-              description: 'Filter by maximum budget amount',
+              description: "Filter by maximum budget amount",
             },
           },
         },
         response: {
           200: {
-            description: 'List of all work orders',
-            type: 'object',
+            description: "List of all work orders",
+            type: "object",
             properties: {
-              page: { type: 'number' },
-              limit: { type: 'number' },
-              total: { type: 'number' },
-              totalPages: { type: 'number' },
+              page: { type: "number" },
+              limit: { type: "number" },
+              total: { type: "number" },
+              totalPages: { type: "number" },
               content: {
-                type: 'array',
+                type: "array",
                 items: workOrderResponseSchema,
               },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeGetAllWorkOrdersController())
+    buildRoute(makeGetAllWorkOrdersController()),
   );
   fastify.get(
-    '/:id',
+    "/:id",
     {
-      preHandler: optionalAuthMiddleware,
+      preHandler: customerOrUserAuthMiddleware,
       schema: {
-        summary: 'Get Work Order by ID',
+        summary: "Get Work Order by ID",
         description:
-          'Retrieves complete details of a specific work order including all associated services, parts/supplies, customer information, vehicle details, current status, and budget calculations.',
-        tags: ['work-order'],
+          "Retrieves complete details of a specific work order including all associated services, parts/supplies, customer information, vehicle details, current status, and budget calculations.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         params: {
-          type: 'object',
-          description: 'Path parameters',
+          type: "object",
+          description: "Path parameters",
           properties: {
             id: {
-              type: 'string',
-              description: 'Unique identifier of the work order',
-              format: 'uuid',
+              type: "string",
+              description: "Unique identifier of the work order",
+              format: "uuid",
             },
           },
-          required: ['id'],
+          required: ["id"],
         },
         response: {
           200: {
-            description: 'Work order retrieved successfully',
+            description: "Work order retrieved successfully",
             ...workOrderResponseSchema,
           },
           400: {
-            description: 'Bad Request',
-            type: 'object',
+            description: "Bad Request",
+            type: "object",
             properties: {
-              message: { type: 'string' },
+              message: { type: "string" },
             },
           },
           404: {
-            description: 'Not found',
-            type: 'object',
+            description: "Not found",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeGetWorkOrderByIdController())
+    buildRoute(makeGetWorkOrderByIdController()),
   );
   fastify.patch(
-    '/:id',
+    "/:id",
     {
       preHandler: authMiddleware,
       schema: {
-        summary: 'Update Work Order',
+        summary: "Update Work Order",
         description:
-          'Updates an existing work order. Commonly used to modify services, add/remove parts and supplies, or change the status as work progresses. Budget is automatically recalculated based on changes.',
-        tags: ['work-order'],
+          "Updates an existing work order. Commonly used to modify services, add/remove parts and supplies, or change the status as work progresses. Budget is automatically recalculated based on changes.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         params: {
-          type: 'object',
-          description: 'Path parameters',
+          type: "object",
+          description: "Path parameters",
           properties: {
             id: {
-              type: 'string',
-              description: 'Unique identifier of the work order to update',
-              format: 'uuid',
+              type: "string",
+              description: "Unique identifier of the work order to update",
+              format: "uuid",
             },
           },
-          required: ['id'],
+          required: ["id"],
         },
         body: {
-          type: 'object',
-          description: 'Work order update payload (all fields optional)',
+          type: "object",
+          description: "Work order update payload (all fields optional)",
           properties: {
             serviceIds: {
-              type: 'array',
-              items: { type: 'string', format: 'uuid' },
-              description: 'Updated array of service IDs (replaces existing services)',
+              type: "array",
+              items: { type: "string", format: "uuid" },
+              description:
+                "Updated array of service IDs (replaces existing services)",
             },
             partAndSupplyIds: {
-              type: 'array',
-              items: { type: 'string', format: 'uuid' },
-              description: 'Updated array of part/supply IDs (replaces existing parts)',
+              type: "array",
+              items: { type: "string", format: "uuid" },
+              description:
+                "Updated array of part/supply IDs (replaces existing parts)",
             },
             status: {
-              type: 'string',
+              type: "string",
               enum: [
-                'RECEIVED',
-                'IN_DIAGNOSIS',
-                'WAITING_APPROVAL',
-                'APPROVED',
-                'IN_EXECUTION',
-                'FINISHED',
-                'DELIVERED',
-                'CANCELED',
+                "RECEIVED",
+                "IN_DIAGNOSIS",
+                "WAITING_APPROVAL",
+                "APPROVED",
+                "IN_EXECUTION",
+                "FINISHED",
+                "DELIVERED",
+                "CANCELED",
               ],
-              description: 'Updated work order status based on current progress',
+              description:
+                "Updated work order status based on current progress",
             },
           },
         },
         response: {
           200: {
-            description: 'Work order updated successfully',
+            description: "Work order updated successfully",
             ...workOrderResponseSchema,
           },
           400: {
-            description: 'Bad Request',
-            type: 'object',
+            description: "Bad Request",
+            type: "object",
             properties: {
-              message: { type: 'string' },
+              message: { type: "string" },
             },
           },
           404: {
-            description: 'Work order not found',
-            type: 'object',
+            description: "Work order not found",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeUpdateWorkOrderController())
+    buildRoute(makeUpdateWorkOrderController()),
   );
   fastify.post(
-    '/:id/approve',
+    "/:id/approve",
     {
-      preHandler: optionalAuthMiddleware,
+      preHandler: customerOrUserAuthMiddleware,
       schema: {
-        summary: 'Approve Work Order',
+        summary: "Approve Work Order",
         description:
-          'Approves a work order that is in WAITING_APPROVAL status, allowing work to proceed. Sends an email notification to the customer informing them of the approval and next steps.',
-        tags: ['work-order'],
+          "Approves a work order that is in WAITING_APPROVAL status, allowing work to proceed. Sends an email notification to the customer informing them of the approval and next steps.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         params: {
-          type: 'object',
-          description: 'Path parameters',
+          type: "object",
+          description: "Path parameters",
           properties: {
             id: {
-              type: 'string',
-              description: 'Unique identifier of the work order to approve',
-              format: 'uuid',
+              type: "string",
+              description: "Unique identifier of the work order to approve",
+              format: "uuid",
             },
           },
-          required: ['id'],
+          required: ["id"],
         },
         response: {
           200: {
-            description: 'Work order approved successfully',
+            description: "Work order approved successfully",
             ...workOrderResponseSchema,
           },
           400: {
-            description: 'Bad Request',
-            type: 'object',
+            description: "Bad Request",
+            type: "object",
             properties: {
-              message: { type: 'string' },
+              message: { type: "string" },
             },
           },
           404: {
-            description: 'Work order not found',
-            type: 'object',
+            description: "Work order not found",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeApproveWorkOrderController())
+    buildRoute(makeApproveWorkOrderController()),
   );
   fastify.post(
-    '/:id/cancel',
+    "/:id/cancel",
     {
-      preHandler: optionalAuthMiddleware,
+      preHandler: customerOrUserAuthMiddleware,
       schema: {
-        summary: 'Cancel Work Order',
+        summary: "Cancel Work Order",
         description:
-          'Cancels a work order that is in RECEIVED, IN_DIAGNOSIS, WAITING_APPROVAL, APPROVED, or IN_EXECUTION status. Sends an email notification to the customer informing them of the cancellation and any next steps.',
-        tags: ['work-order'],
+          "Cancels a work order that is in RECEIVED, IN_DIAGNOSIS, WAITING_APPROVAL, APPROVED, or IN_EXECUTION status. Sends an email notification to the customer informing them of the cancellation and any next steps.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         params: {
-          type: 'object',
-          description: 'Path parameters',
+          type: "object",
+          description: "Path parameters",
           properties: {
             id: {
-              type: 'string',
-              description: 'Unique identifier of the work order to cancel',
-              format: 'uuid',
+              type: "string",
+              description: "Unique identifier of the work order to cancel",
+              format: "uuid",
             },
           },
-          required: ['id'],
+          required: ["id"],
         },
         response: {
           200: {
-            description: 'Work order canceled successfully',
+            description: "Work order canceled successfully",
             ...workOrderResponseSchema,
           },
           400: {
-            description: 'Bad Request',
-            type: 'object',
+            description: "Bad Request",
+            type: "object",
             properties: {
-              message: { type: 'string' },
+              message: { type: "string" },
             },
           },
           404: {
-            description: 'Work order not found',
-            type: 'object',
+            description: "Work order not found",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeCancelWorkOrderController())
+    buildRoute(makeCancelWorkOrderController()),
   );
   fastify.delete(
-    '/:id',
+    "/:id",
     {
       preHandler: authMiddleware,
       schema: {
-        summary: 'Delete Work Order',
+        summary: "Delete Work Order",
         description:
-          'Permanently removes a work order from the system. This action cannot be undone and will delete all associated service history and documentation. Consider setting status to CANCELED instead.',
-        tags: ['work-order'],
+          "Permanently removes a work order from the system. This action cannot be undone and will delete all associated service history and documentation. Consider setting status to CANCELED instead.",
+        tags: ["work-order"],
         security: [{ bearerAuth: [] }],
         params: {
-          type: 'object',
-          description: 'Path parameters',
+          type: "object",
+          description: "Path parameters",
           properties: {
             id: {
-              type: 'string',
-              description: 'Unique identifier of the work order to delete',
-              format: 'uuid',
+              type: "string",
+              description: "Unique identifier of the work order to delete",
+              format: "uuid",
             },
           },
-          required: ['id'],
+          required: ["id"],
         },
         response: {
           204: {
-            description: 'Work order deleted successfully',
+            description: "Work order deleted successfully",
           },
           404: {
-            description: 'Work order not found',
-            type: 'object',
+            description: "Work order not found",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
           500: {
-            description: 'Internal Server Error',
-            type: 'object',
+            description: "Internal Server Error",
+            type: "object",
             properties: {
-              error: { type: 'string' },
+              error: { type: "string" },
             },
           },
         },
       },
     },
-    buildRoute(makeDeleteWorkOrderController())
+    buildRoute(makeDeleteWorkOrderController()),
   );
 }
