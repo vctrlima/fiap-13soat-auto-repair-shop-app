@@ -116,6 +116,7 @@ jobs:
           output "secrets_manager_role_arn" { value = data.terraform_remote_state.k8s_infra.outputs.secrets_manager_role_arn }
           output "secrets_manager_name"     { value = data.terraform_remote_state.k8s_infra.outputs.secrets_manager_name }
           output "alb_dns_name"             { value = data.terraform_remote_state.k8s_infra.outputs.alb_dns_name }
+          output "grafana_target_group_arn" { value = data.terraform_remote_state.k8s_infra.outputs.grafana_target_group_arn }
           EOF
           cd /tmp/tf-remote-state
           terraform init
@@ -124,6 +125,7 @@ jobs:
           echo "SECRETS_ROLE_ARN=$(terraform output -raw secrets_manager_role_arn)" >> $GITHUB_OUTPUT
           echo "SECRET_NAME=$(terraform output -raw secrets_manager_name)" >> $GITHUB_OUTPUT
           echo "ALB_DNS=$(terraform output -raw alb_dns_name)" >> $GITHUB_OUTPUT
+          echo "GRAFANA_TG_ARN=$(terraform output -raw grafana_target_group_arn)" >> $GITHUB_OUTPUT
 
       - name: Update kubeconfig
         run: |
@@ -136,7 +138,7 @@ jobs:
           IMAGE_TAG="${{ needs.set-env.outputs.image_tag_prefix }}-${{ github.event.workflow_run.head_sha }}"
           ENVIRONMENT="${{ needs.set-env.outputs.environment }}"
 
-          # Replace placeholders
+          # Replace placeholderss
           sed -i "s|\${ECR_REPOSITORY_URL}|${{ env.ECR_REPOSITORY }}|g" k8s/aws/deployment.yaml
           sed -i "s|\${IMAGE_TAG}|${IMAGE_TAG}|g" k8s/aws/deployment.yaml
           sed -i "s|\${TARGET_GROUP_ARN}|${{ steps.infra.outputs.TARGET_GROUP_ARN }}|g" k8s/aws/deployment.yaml
@@ -157,6 +159,25 @@ jobs:
           kubectl rollout restart deployment/auto-repair-shop -n auto-repair-shop
           kubectl rollout status deployment/auto-repair-shop \
             --namespace auto-repair-shop --timeout=300s
+
+      - name: Deploy monitoring stack
+        run: |
+          # Generate a random Grafana admin password if not set via secret
+          GRAFANA_PASS="${{ secrets.GRAFANA_ADMIN_PASSWORD }}"
+          if [ -z "$GRAFANA_PASS" ]; then
+            GRAFANA_PASS=$(openssl rand -base64 24)
+            echo "::notice::Grafana admin password auto-generated. Set GRAFANA_ADMIN_PASSWORD secret to use a fixed one."
+          fi
+          sed -i "s|\${GRAFANA_ADMIN_PASSWORD}|${GRAFANA_PASS}|g" k8s/monitoring/grafana.yaml
+          sed -i "s|\${GRAFANA_TARGET_GROUP_ARN}|${{ steps.infra.outputs.GRAFANA_TG_ARN }}|g" k8s/monitoring/grafana.yaml
+
+          kubectl apply -f k8s/monitoring/namespace.yaml
+          kubectl apply -f k8s/monitoring/otel-collector.yaml
+          kubectl apply -f k8s/monitoring/alerting-rules.yaml
+          kubectl apply -f k8s/monitoring/grafana-dashboards.yaml
+          kubectl apply -f k8s/monitoring/grafana.yaml
+          kubectl rollout status deployment/otel-collector -n monitoring --timeout=120s || true
+          kubectl rollout status deployment/grafana -n monitoring --timeout=120s || true
 
       - name: Health check
         run: |
