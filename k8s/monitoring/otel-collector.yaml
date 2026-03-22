@@ -34,13 +34,6 @@ data:
       debug:
         verbosity: basic
 
-      # OTLP exporter — Grafana Cloud backend
-      # Configure via environment variables or update endpoint/credentials directly
-      otlphttp/grafana:
-        endpoint: ${GRAFANA_OTLP_ENDPOINT}
-        headers:
-          Authorization: "Basic ${GRAFANA_OTLP_TOKEN}"
-
       # Prometheus exporter for metrics scraping (local Grafana)
       prometheus:
         endpoint: 0.0.0.0:8889
