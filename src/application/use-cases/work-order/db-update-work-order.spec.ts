@@ -305,4 +305,57 @@ describe('DbUpdateWorkOrder', () => {
       html: expect.any(String),
     });
   });
+
+  it('should return result without sending email when mailing is disabled', async () => {
+    const env = require('@/main/config/env');
+    env.mailing.enabled = false;
+
+    const params: UpdateWorkOrder.Params = {
+      id: faker.string.uuid(),
+      status: Status.InExecution,
+    };
+
+    const customer: Customer = {
+      id: faker.string.uuid(),
+      document: faker.string.numeric(11),
+      email: faker.internet.email(),
+      name: faker.person.fullName(),
+      phone: faker.phone.number(),
+      vehicles: [],
+      createdAt: new Date(),
+      updatedAt: null,
+    };
+
+    const vehicle: Vehicle = {
+      id: faker.string.uuid(),
+      customer,
+      licensePlate: faker.string.alphanumeric(7).toUpperCase(),
+      brand: faker.vehicle.manufacturer(),
+      model: faker.vehicle.model(),
+      year: faker.number.int({ min: 1990, max: 2024 }),
+      createdAt: new Date(),
+      updatedAt: undefined,
+    };
+
+    const updatedWorkOrder: UpdateWorkOrder.Result = {
+      id: params.id,
+      customer,
+      vehicle,
+      services: [],
+      partsAndSupplies: [],
+      status: Status.InExecution,
+      budget: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    jest.spyOn(updateWorkOrderRepository, 'update').mockResolvedValueOnce(updatedWorkOrder);
+
+    const result = await dbUpdateWorkOrder.update(params);
+
+    expect(sendEmailTransporter.send).not.toHaveBeenCalled();
+    expect(result).toEqual(updatedWorkOrder);
+
+    env.mailing.enabled = true;
+  });
 });
