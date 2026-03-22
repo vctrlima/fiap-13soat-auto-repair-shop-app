@@ -14,7 +14,7 @@ data:
       - name: api-health
         rules:
           - alert: HighAPILatency
-            expr: histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le)) > 2000
+            expr: histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le)) > 2000
             for: 5m
             labels:
               severity: warning
@@ -23,7 +23,7 @@ data:
               description: "A latência do percentil 95 está acima de 2 segundos nos últimos 5 minutos."
 
           - alert: CriticalAPILatency
-            expr: histogram_quantile(0.99, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le)) > 5000
+            expr: histogram_quantile(0.99, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le)) > 5000
             for: 3m
             labels:
               severity: critical
@@ -32,7 +32,7 @@ data:
               description: "A latência do percentil 99 está acima de 5 segundos nos últimos 3 minutos."
 
           - alert: HighErrorRate
-            expr: sum(rate(auto_repair_shop_http_server_request_count_total{status=~"5.."}[5m])) / sum(rate(auto_repair_shop_http_server_request_count_total[5m])) > 0.05
+            expr: sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~"5.."}[5m])) / sum(rate(auto_repair_shop_http_server_request_count_total[5m])) > 0.05
             for: 5m
             labels:
               severity: critical
@@ -41,7 +41,7 @@ data:
               description: "Mais de 5% das requisições estão retornando erro 5xx nos últimos 5 minutos."
 
           - alert: ApplicationDown
-            expr: up{job="auto-repair-shop-api"} == 0
+            expr: up{job="otel-collector"} == 0
             for: 1m
             labels:
               severity: critical
@@ -87,7 +87,7 @@ data:
       - name: database-health
         rules:
           - alert: HighDatabaseQueryLatency
-            expr: histogram_quantile(0.95, sum(rate(auto_repair_shop_db_query_duration_bucket[5m])) by (le)) > 1000
+            expr: histogram_quantile(0.95, sum(rate(auto_repair_shop_db_query_duration_milliseconds_bucket[5m])) by (le)) > 1000
             for: 5m
             labels:
               severity: warning
