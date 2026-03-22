@@ -110,5 +110,20 @@ describe('DbApproveWorkOrder', () => {
 
       await expect(sut.approve(params)).rejects.toThrow('Email sending failed');
     });
+
+    it('should not send email when mailing is disabled', async () => {
+      const env = require('@/main/config/env');
+      env.mailing.enabled = false;
+
+      const params: ApproveWorkOrder.Params = { id: faker.string.uuid() };
+      updateWorkOrderRepository.update.mockResolvedValue(mockWorkOrderResult as any);
+
+      const result = await sut.approve(params);
+
+      expect(sendEmailTransporter.send).not.toHaveBeenCalled();
+      expect(result).toEqual(mockWorkOrderResult);
+
+      env.mailing.enabled = true;
+    });
   });
 });
