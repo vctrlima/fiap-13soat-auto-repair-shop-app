@@ -1,6 +1,6 @@
 {
   "name": "@fiap-13soat-auto-repair-shop/app",
-  "version": "1.0.0",
+  "version": "1.0.0-SNAPSHOT",
   "private": true,
   "_moduleAliases": {
     "@": "dist"

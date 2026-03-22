@@ -151,14 +151,30 @@ jobs:
           kubectl apply -f k8s/aws/deployment.yaml
           kubectl apply --server-side -f k8s/aws/external-secrets.yaml
 
-          # Wait for ExternalSecret sync
-          kubectl wait --for=condition=Ready externalsecret/auto-repair-shop-secret \
-            --namespace auto-repair-shop --timeout=120s || true
+          # Wait for ExternalSecret sync (fail if not ready - secrets are required)
+          echo "Waiting for ExternalSecret to sync..."
+          if ! kubectl wait --for=condition=Ready externalsecret/auto-repair-shop-secret \
+            --namespace auto-repair-shop --timeout=120s; then
+            echo "::error::ExternalSecret failed to sync. Debugging info:"
+            kubectl get externalsecret -n auto-repair-shop -o yaml
+            kubectl get secretstore -n auto-repair-shop -o yaml
+            kubectl get secret auto-repair-shop-secret -n auto-repair-shop -o json | jq '.data | keys' || true
+            exit 1
+          fi
 
           # Restart deployment
           kubectl rollout restart deployment/auto-repair-shop -n auto-repair-shop
-          kubectl rollout status deployment/auto-repair-shop \
-            --namespace auto-repair-shop --timeout=300s
+          if ! kubectl rollout status deployment/auto-repair-shop \
+            --namespace auto-repair-shop --timeout=300s; then
+            echo "::error::Deployment rollout failed. Debugging info:"
+            kubectl get pods -n auto-repair-shop
+            kubectl describe pods -n auto-repair-shop -l app=auto-repair-shop | tail -50
+            for pod in $(kubectl get pods -n auto-repair-shop -l app=auto-repair-shop -o jsonpath='{.items[*].metadata.name}'); do
+              echo "=== Logs for $pod ==="
+              kubectl logs "$pod" -n auto-repair-shop --tail=50 || true
+            done
+            exit 1
+          fi
 
       - name: Deploy monitoring stack
         run: |
