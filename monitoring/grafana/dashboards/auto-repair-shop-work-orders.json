@@ -47,13 +47,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
+          "expr": "sum(increase(auto_repair_shop_business_work_order_created_total[1d]))",
           "legendFormat": "Criadas",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[1d]))",
+          "expr": "sum(increase(auto_repair_shop_business_work_order_completed_total{work_order_status=\"approved\"}[1d]))",
           "legendFormat": "Aprovadas",
           "refId": "B"
         }
@@ -85,7 +85,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[5m]))",
+          "expr": "sum(rate(auto_repair_shop_business_auth_login_failure_total[5m]))",
           "legendFormat": "Falhas de Auth",
           "refId": "C"
         }

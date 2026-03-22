@@ -110,5 +110,20 @@ describe('DbCancelWorkOrder', () => {
 
       await expect(sut.cancel(params)).rejects.toThrow('Email sending failed');
     });
+
+    it('should not send email when mailing is disabled', async () => {
+      const env = require('@/main/config/env');
+      env.mailing.enabled = false;
+
+      const params: CancelWorkOrder.Params = { id: faker.string.uuid() };
+      updateWorkOrderRepository.update.mockResolvedValue(mockWorkOrderResult as any);
+
+      const result = await sut.cancel(params);
+
+      expect(sendEmailTransporter.send).not.toHaveBeenCalled();
+      expect(result).toEqual(mockWorkOrderResult);
+
+      env.mailing.enabled = true;
+    });
   });
 });

@@ -118,6 +118,40 @@ describe('DbCreateWorkOrder', () => {
       createdWorkOrder,
       `http://localhost:3000/api/work-orders/${createdWorkOrder.id}`
     );
+  });
+
+  it('should not send email when mailing is disabled', async () => {
+    const env = require('@/main/config/env');
+    env.mailing.enabled = false;
+
+    const params: CreateWorkOrder.Params = {
+      customerId: faker.string.uuid(),
+      vehicleId: faker.string.uuid(),
+      serviceIds: [faker.string.uuid()],
+      partAndSupplyIds: [],
+      status: Status.Received,
+    };
+
+    const createdWorkOrder: CreateWorkOrder.Result = {
+      id: faker.string.uuid(),
+      customer: { id: params.customerId, document: '12345678901', email: 'x@y.com', name: 'Test', phone: '111', vehicles: [], createdAt: new Date(), updatedAt: null },
+      vehicle: { id: params.vehicleId, customer: {} as any, licensePlate: 'ABC1234', brand: 'Ford', model: 'Ka', year: 2020, createdAt: new Date(), updatedAt: undefined },
+      services: [],
+      partsAndSupplies: [],
+      status: Status.Received,
+      budget: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    jest.spyOn(createWorkOrderRepository, 'create').mockResolvedValueOnce(createdWorkOrder);
+
+    const result = await dbCreateWorkOrder.create(params);
+
+    expect(sendEmailTransporter.send).not.toHaveBeenCalled();
+    expect(result).toEqual(createdWorkOrder);
+
+    env.mailing.enabled = true;
     expect(result).toEqual(createdWorkOrder);
   });
 

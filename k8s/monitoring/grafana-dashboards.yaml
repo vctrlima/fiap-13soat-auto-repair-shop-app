@@ -26,7 +26,7 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
+                "expr": "sum(increase(auto_repair_shop_business_work_order_created_total[1d]))",
                 "legendFormat": "Ordens Criadas",
                 "refId": "A"
               }
@@ -47,7 +47,7 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[1d]))",
+                "expr": "sum(increase(auto_repair_shop_business_work_order_completed_total{work_order_status=\"approved\"}[1d]))",
                 "legendFormat": "Ordens Aprovadas",
                 "refId": "A"
               }
@@ -170,7 +170,7 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[1h]))",
+                "expr": "sum(increase(auto_repair_shop_business_auth_login_failure_total[1h]))",
                 "legendFormat": "Falhas (1h)",
                 "refId": "A"
               }
@@ -196,7 +196,7 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/api/customers.*\",http_status_code=~\"2..\"}[1d]))",
+                "expr": "sum(increase(auto_repair_shop_business_customer_created_total[1d]))",
                 "legendFormat": "Novos Clientes",
                 "refId": "A"
               }
@@ -211,13 +211,13 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=\"/api/work-orders\",http_status_code=~\"2..\"}[24h]))",
+                "expr": "sum(increase(auto_repair_shop_business_work_order_created_total[24h]))",
                 "legendFormat": "Criadas",
                 "refId": "A"
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[24h]))",
+                "expr": "sum(increase(auto_repair_shop_business_work_order_completed_total{work_order_status=\"approved\"}[24h]))",
                 "legendFormat": "Aprovadas",
                 "refId": "B"
               }
@@ -297,13 +297,13 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
+                "expr": "sum(increase(auto_repair_shop_business_work_order_created_total[1d]))",
                 "legendFormat": "Criadas",
                 "refId": "A"
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[1d]))",
+                "expr": "sum(increase(auto_repair_shop_business_work_order_completed_total{work_order_status=\"approved\"}[1d]))",
                 "legendFormat": "Aprovadas",
                 "refId": "B"
               }
@@ -335,7 +335,7 @@ data:
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[5m]))",
+                "expr": "sum(rate(auto_repair_shop_business_auth_login_failure_total[5m]))",
                 "legendFormat": "Falhas de Auth",
                 "refId": "C"
               }

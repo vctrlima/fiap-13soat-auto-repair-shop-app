@@ -47,4 +47,27 @@ describe('DbUpdateUser', () => {
     expect(updateUserRepository.update).toHaveBeenCalledWith(params);
     expect(result).toEqual(updatedUser);
   });
+
+  it('should update a user without hashing when no password is provided', async () => {
+    const params: UpdateUser.Params = {
+      id: faker.string.uuid(),
+      name: faker.person.fullName(),
+      email: faker.internet.email(),
+      role: Role.Admin as Role,
+    };
+    const updatedUser: UpdateUser.Result = {
+      id: params.id,
+      name: params.name || 'User Name',
+      email: params.email || 'user@email.com',
+      role: params.role || (Role.Default as Role),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    jest.spyOn(updateUserRepository, 'update').mockResolvedValueOnce(updatedUser);
+
+    const result = await dbUpdateUser.update(params);
+
+    expect(hasher.hash).not.toHaveBeenCalled();
+    expect(result).toEqual(updatedUser);
+  });
 });
