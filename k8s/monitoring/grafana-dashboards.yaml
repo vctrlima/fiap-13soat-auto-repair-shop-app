@@ -24,7 +24,7 @@ data:
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
             "targets": [
               {
-                "expr": "increase(auto_repair_shop_business_work_order_created_total[1d])",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
                 "legendFormat": "Ordens Criadas",
                 "refId": "A"
               }
@@ -43,7 +43,7 @@ data:
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
             "targets": [
               {
-                "expr": "increase(auto_repair_shop_business_work_order_completed_total[1d])",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
                 "legendFormat": "Ordens Finalizadas",
                 "refId": "A"
               }
@@ -62,17 +62,17 @@ data:
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
             "targets": [
               {
-                "expr": "histogram_quantile(0.50, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.50, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\"}[5m])) by (le))",
                 "legendFormat": "p50",
                 "refId": "A"
               },
               {
-                "expr": "histogram_quantile(0.90, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.90, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\"}[5m])) by (le))",
                 "legendFormat": "p90",
                 "refId": "B"
               },
               {
-                "expr": "histogram_quantile(0.99, sum(rate(auto_repair_shop_http_server_request_duration_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.99, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\"}[5m])) by (le))",
                 "legendFormat": "p99",
                 "refId": "C"
               }
@@ -110,7 +110,7 @@ data:
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
             "targets": [
               {
-                "expr": "sum(rate(auto_repair_shop_db_query_error_count_total[5m]))",
+                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
                 "legendFormat": "DB Errors/s",
                 "refId": "A"
               }
@@ -129,12 +129,12 @@ data:
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
             "targets": [
               {
-                "expr": "histogram_quantile(0.50, sum(rate(auto_repair_shop_db_query_duration_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.50, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\",http_route=~\".*work-order.*\"}[5m])) by (le))",
                 "legendFormat": "p50",
                 "refId": "A"
               },
               {
-                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_db_query_duration_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.95, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\",http_route=~\".*work-order.*\"}[5m])) by (le))",
                 "legendFormat": "p95",
                 "refId": "B"
               }
@@ -153,7 +153,7 @@ data:
             "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
             "targets": [
               {
-                "expr": "increase(auto_repair_shop_business_auth_login_failure_total[1h])",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[1h]))",
                 "legendFormat": "Falhas (1h)",
                 "refId": "A"
               }
@@ -177,7 +177,7 @@ data:
             "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
             "targets": [
               {
-                "expr": "increase(auto_repair_shop_business_customer_created_total[1d])",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/api/customers.*\",http_status_code=~\"2..\"}[1d]))",
                 "legendFormat": "Novos Clientes",
                 "refId": "A"
               }
@@ -190,12 +190,12 @@ data:
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
             "targets": [
               {
-                "expr": "auto_repair_shop_business_work_order_created_total - auto_repair_shop_business_work_order_completed_total",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_status_code=~\"2..\"}[24h]))",
                 "legendFormat": "Em Andamento",
                 "refId": "A"
               },
               {
-                "expr": "auto_repair_shop_business_work_order_completed_total",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_status_code=~\"4..|5..\"}[24h]))",
                 "legendFormat": "Finalizadas",
                 "refId": "B"
               }
@@ -208,7 +208,7 @@ data:
             "gridPos": { "h": 4, "w": 6, "x": 0, "y": 28 },
             "targets": [
               {
-                "expr": "up{job=\"auto-repair-shop-api\"}",
+                "expr": "max(up{job=~\".*otel-collector.*|.*auto-repair-shop.*\"})",
                 "legendFormat": "Status",
                 "refId": "A"
               }
@@ -241,17 +241,17 @@ data:
             "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
             "targets": [
               {
-                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{route=~\".*work-order.*status.*DIAGNOSIS.*\"}) / avg(auto_repair_shop_http_server_request_count{route=~\".*work-order.*status.*DIAGNOSIS.*\"})",
+                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"}) / avg(auto_repair_shop_http_server_request_count{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"})",
                 "legendFormat": "Diagnóstico",
                 "refId": "A"
               },
               {
-                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{route=~\".*work-order.*status.*IN_PROGRESS.*\"}) / avg(auto_repair_shop_http_server_request_count{route=~\".*work-order.*status.*IN_PROGRESS.*\"})",
+                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"}) / avg(auto_repair_shop_http_server_request_count{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"})",
                 "legendFormat": "Execução",
                 "refId": "B"
               },
               {
-                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{route=~\".*work-order.*status.*DONE.*\"}) / avg(auto_repair_shop_http_server_request_count{route=~\".*work-order.*status.*DONE.*\"})",
+                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{http_route=~\".*work-order.*status.*DONE.*\"}) / avg(auto_repair_shop_http_server_request_count{http_route=~\".*work-order.*status.*DONE.*\"})",
                 "legendFormat": "Finalização",
                 "refId": "C"
               }
@@ -267,12 +267,12 @@ data:
             "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
             "targets": [
               {
-                "expr": "increase(auto_repair_shop_business_work_order_created_total[1d])",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
                 "legendFormat": "Criadas",
                 "refId": "A"
               },
               {
-                "expr": "increase(auto_repair_shop_business_work_order_completed_total[1d])",
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
                 "legendFormat": "Finalizadas",
                 "refId": "B"
               }
@@ -290,17 +290,17 @@ data:
             "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
             "targets": [
               {
-                "expr": "sum(rate(auto_repair_shop_db_query_error_count_total[5m]))",
+                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
                 "legendFormat": "Erros de DB",
                 "refId": "A"
               },
               {
-                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{status=~\"5..\"}[5m]))",
+                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
                 "legendFormat": "HTTP 5xx",
                 "refId": "B"
               },
               {
-                "expr": "sum(rate(auto_repair_shop_business_auth_login_failure_total[5m]))",
+                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[5m]))",
                 "legendFormat": "Falhas de Auth",
                 "refId": "C"
               }
