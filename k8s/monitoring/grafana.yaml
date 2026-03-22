@@ -101,7 +101,7 @@ data:
       - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://otel-collector.monitoring.svc.cluster.local:8889
+        url: http://prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
         editable: false
 ---
