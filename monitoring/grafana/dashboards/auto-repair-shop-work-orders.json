@@ -1,0 +1,101 @@
+{
+  "id": null,
+  "uid": "auto-repair-shop-work-orders",
+  "title": "Auto Repair Shop - Ordens de Serviço",
+  "tags": ["auto-repair-shop", "work-orders"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tempo Médio de Execução por Status",
+      "description": "Tempo médio que ordens de serviço permanecem em cada status (Diagnóstico, Execução, Finalização)",
+      "type": "barchart",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"})",
+          "legendFormat": "Diagnóstico",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"})",
+          "legendFormat": "Execução",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*DONE.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*DONE.*\"})",
+          "legendFormat": "Finalização",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Volume de Ordens por Dia",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
+          "legendFormat": "Criadas",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
+          "legendFormat": "Finalizadas",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 70 }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Erros e Falhas nas Integrações",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(auto_repair_shop_db_query_error_count_total[5m]))",
+          "legendFormat": "Erros de DB",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
+          "legendFormat": "HTTP 5xx",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[5m]))",
+          "legendFormat": "Falhas de Auth",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 20 }
+        }
+      }
+    }
+  ]
+}
