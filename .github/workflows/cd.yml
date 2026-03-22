@@ -18,7 +18,7 @@ env:
 jobs:
   set-env:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     outputs:
       environment: ${{ steps.env.outputs.environment }}
       eks_cluster: ${{ steps.env.outputs.eks_cluster }}
