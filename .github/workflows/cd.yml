@@ -148,8 +148,8 @@ jobs:
           sed -i "s|\${ENVIRONMENT}|${ENVIRONMENT}|g" k8s/aws/external-secrets.yaml
 
           # Apply manifests
-          kubectl apply -f k8s/aws/deployment.yaml
-          kubectl apply --server-side -f k8s/aws/external-secrets.yaml
+          kubectl apply --server-side --force-conflicts -f k8s/aws/deployment.yaml
+          kubectl apply --server-side --force-conflicts -f k8s/aws/external-secrets.yaml
 
           # Wait for ExternalSecret sync (fail if not ready - secrets are required)
           echo "Waiting for ExternalSecret to sync..."
