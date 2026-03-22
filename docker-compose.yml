@@ -35,6 +35,7 @@ services:
       OTEL_ENABLED: "true"
       OTEL_SERVICE_NAME: auto-repair-shop-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_DEBUG: "true"
     depends_on:
       postgres:
         condition: service_healthy
