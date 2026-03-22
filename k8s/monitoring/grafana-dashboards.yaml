@@ -9,7 +9,6 @@ metadata:
 data:
   auto-repair-shop-overview.json: |
     {
-      "dashboard": {
         "id": null,
         "uid": "auto-repair-shop-overview",
         "title": "Auto Repair Shop - Overview",
@@ -223,11 +222,9 @@ data:
             }
           }
         ]
-      }
     }
   auto-repair-shop-work-orders.json: |
     {
-      "dashboard": {
         "id": null,
         "uid": "auto-repair-shop-work-orders",
         "title": "Auto Repair Shop - Ordens de Serviço",
@@ -316,5 +313,4 @@ data:
             }
           }
         ]
-      }
     }
