@@ -192,6 +192,7 @@ jobs:
           kubectl apply -f k8s/monitoring/alerting-rules.yaml
           kubectl apply -f k8s/monitoring/grafana-dashboards.yaml
           kubectl apply -f k8s/monitoring/grafana.yaml
+          kubectl rollout restart deployment/grafana -n monitoring
           kubectl rollout status deployment/otel-collector -n monitoring --timeout=120s || true
           kubectl rollout status deployment/grafana -n monitoring --timeout=120s || true
 
