@@ -21,9 +21,11 @@ data:
             "id": 1,
             "title": "Volume Diário de Ordens de Serviço (Criadas)",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
                 "legendFormat": "Ordens Criadas",
                 "refId": "A"
@@ -40,9 +42,11 @@ data:
             "id": 2,
             "title": "Volume Diário de Ordens de Serviço (Finalizadas)",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
                 "legendFormat": "Ordens Finalizadas",
                 "refId": "A"
@@ -59,20 +63,24 @@ data:
             "id": 3,
             "title": "Latência das APIs (p50, p90, p99)",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
             "targets": [
               {
-                "expr": "histogram_quantile(0.50, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\"}[5m])) by (le))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "histogram_quantile(0.50, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p50",
                 "refId": "A"
               },
               {
-                "expr": "histogram_quantile(0.90, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\"}[5m])) by (le))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "histogram_quantile(0.90, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p90",
                 "refId": "B"
               },
               {
-                "expr": "histogram_quantile(0.99, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\"}[5m])) by (le))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "histogram_quantile(0.99, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p99",
                 "refId": "C"
               }
@@ -88,9 +96,11 @@ data:
             "id": 4,
             "title": "Taxa de Requisições HTTP (req/s)",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(rate(auto_repair_shop_http_server_request_count_total[5m]))",
                 "legendFormat": "Total req/s",
                 "refId": "A"
@@ -107,10 +117,12 @@ data:
             "id": 5,
             "title": "Erros de Banco de Dados",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
             "targets": [
               {
-                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "sum(rate(auto_repair_shop_db_query_error_count_total[5m]))",
                 "legendFormat": "DB Errors/s",
                 "refId": "A"
               }
@@ -126,15 +138,18 @@ data:
             "id": 6,
             "title": "Latência de Queries no Banco (p50, p95)",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
             "targets": [
               {
-                "expr": "histogram_quantile(0.50, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\",http_route=~\".*work-order.*\"}[5m])) by (le))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "histogram_quantile(0.50, sum(rate(auto_repair_shop_db_query_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p50",
                 "refId": "A"
               },
               {
-                "expr": "histogram_quantile(0.95, sum(rate({__name__=~\"auto_repair_shop_http_server_request_duration(_milliseconds)?_bucket\",http_route=~\".*work-order.*\"}[5m])) by (le))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_db_query_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p95",
                 "refId": "B"
               }
@@ -150,9 +165,11 @@ data:
             "id": 7,
             "title": "Falhas de Login",
             "type": "stat",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[1h]))",
                 "legendFormat": "Falhas (1h)",
                 "refId": "A"
@@ -174,9 +191,11 @@ data:
             "id": 8,
             "title": "Clientes Criados (Hoje)",
             "type": "stat",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/api/customers.*\",http_status_code=~\"2..\"}[1d]))",
                 "legendFormat": "Novos Clientes",
                 "refId": "A"
@@ -185,17 +204,20 @@ data:
           },
           {
             "id": 9,
-            "title": "Ordens em Aberto vs Finalizadas",
+            "title": "Ordens Criadas vs Finalizadas (24h)",
             "type": "piechart",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
             "targets": [
               {
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_status_code=~\"2..\"}[24h]))",
-                "legendFormat": "Em Andamento",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\",http_status_code=~\"2..\"}[24h]))",
+                "legendFormat": "Criadas",
                 "refId": "A"
               },
               {
-                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_status_code=~\"4..|5..\"}[24h]))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\",http_status_code=~\"2..\"}[24h]))",
                 "legendFormat": "Finalizadas",
                 "refId": "B"
               }
@@ -205,9 +227,11 @@ data:
             "id": 10,
             "title": "Uptime da Aplicação",
             "type": "stat",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 4, "w": 6, "x": 0, "y": 28 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "max(up{job=~\".*otel-collector.*|.*auto-repair-shop.*\"})",
                 "legendFormat": "Status",
                 "refId": "A"
@@ -238,20 +262,24 @@ data:
             "title": "Tempo Médio de Execução por Status",
             "description": "Tempo médio que ordens de serviço permanecem em cada status (Diagnóstico, Execução, Finalização)",
             "type": "barchart",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
             "targets": [
               {
-                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"}) / avg(auto_repair_shop_http_server_request_count{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"})",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"})",
                 "legendFormat": "Diagnóstico",
                 "refId": "A"
               },
               {
-                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"}) / avg(auto_repair_shop_http_server_request_count{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"})",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"})",
                 "legendFormat": "Execução",
                 "refId": "B"
               },
               {
-                "expr": "avg(auto_repair_shop_http_server_request_duration_sum{http_route=~\".*work-order.*status.*DONE.*\"}) / avg(auto_repair_shop_http_server_request_count{http_route=~\".*work-order.*status.*DONE.*\"})",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*DONE.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*DONE.*\"})",
                 "legendFormat": "Finalização",
                 "refId": "C"
               }
@@ -264,14 +292,17 @@ data:
             "id": 2,
             "title": "Volume de Ordens por Dia",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
             "targets": [
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\"}[1d]))",
                 "legendFormat": "Criadas",
                 "refId": "A"
               },
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
                 "legendFormat": "Finalizadas",
                 "refId": "B"
@@ -287,19 +318,23 @@ data:
             "id": 3,
             "title": "Erros e Falhas nas Integrações",
             "type": "timeseries",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
             "targets": [
               {
-                "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "expr": "sum(rate(auto_repair_shop_db_query_error_count_total[5m]))",
                 "legendFormat": "Erros de DB",
                 "refId": "A"
               },
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_status_code=~\"5..\"}[5m]))",
                 "legendFormat": "HTTP 5xx",
                 "refId": "B"
               },
               {
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
                 "expr": "sum(rate(auto_repair_shop_http_server_request_count_total{http_route=~\".*/api/auth.*\",http_status_code=~\"401|403\"}[5m]))",
                 "legendFormat": "Falhas de Auth",
                 "refId": "C"
