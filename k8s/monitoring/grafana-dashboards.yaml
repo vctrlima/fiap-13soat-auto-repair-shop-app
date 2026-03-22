@@ -68,19 +68,19 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "histogram_quantile(0.50, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.50, sum(rate(auto_repair_shop_http_request_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p50",
                 "refId": "A"
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "histogram_quantile(0.90, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.90, sum(rate(auto_repair_shop_http_request_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p90",
                 "refId": "B"
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "histogram_quantile(0.99, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket[5m])) by (le))",
+                "expr": "histogram_quantile(0.99, sum(rate(auto_repair_shop_http_request_duration_milliseconds_bucket[5m])) by (le))",
                 "legendFormat": "p99",
                 "refId": "C"
               }
@@ -267,19 +267,19 @@ data:
             "targets": [
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket{http_method=\"POST\",http_route=\"/api/work-orders\"}[5m])) by (le))",
+                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_request_duration_milliseconds_bucket{http_method=\"POST\",http_route=\"/api/work-orders\"}[5m])) by (le))",
                 "legendFormat": "Criação",
                 "refId": "A"
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket{http_method=\"PATCH\",http_route=\"/api/work-orders/:id\"}[5m])) by (le))",
+                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_request_duration_milliseconds_bucket{http_method=\"PATCH\",http_route=\"/api/work-orders/:id\"}[5m])) by (le))",
                 "legendFormat": "Atualização",
                 "refId": "B"
               },
               {
                 "datasource": { "type": "prometheus", "uid": "prometheus" },
-                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket{http_method=\"POST\",http_route=\"/api/work-orders/:id/approve\"}[5m])) by (le))",
+                "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_request_duration_milliseconds_bucket{http_method=\"POST\",http_route=\"/api/work-orders/:id/approve\"}[5m])) by (le))",
                 "legendFormat": "Aprovação",
                 "refId": "C"
               }
