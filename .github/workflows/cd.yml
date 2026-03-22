@@ -196,6 +196,10 @@ jobs:
           kubectl rollout status deployment/otel-collector -n monitoring --timeout=120s || true
           kubectl rollout status deployment/grafana -n monitoring --timeout=120s || true
 
+          # Force-reset Grafana admin password (env var only applies on first boot)
+          kubectl exec deployment/grafana -n monitoring -- \
+            grafana cli admin reset-admin-password "${GRAFANA_PASS}" || true
+
       - name: Health check
         run: |
           echo "Waiting for application to be ready..."
