@@ -30,15 +30,15 @@
     },
     {
       "id": 2,
-      "title": "Volume Diário de Ordens de Serviço (Finalizadas)",
+      "title": "Volume Diário de Ordens de Serviço (Aprovadas)",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
-          "legendFormat": "Ordens Finalizadas",
+          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[1d]))",
+          "legendFormat": "Ordens Aprovadas",
           "refId": "A"
         }
       ],
@@ -194,21 +194,21 @@
     },
     {
       "id": 9,
-      "title": "Ordens Criadas vs Finalizadas (24h)",
+      "title": "Ordens Criadas vs Aprovadas (24h)",
       "type": "piechart",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*work-order.*\",http_status_code=~\"2..\"}[24h]))",
+          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=\"/api/work-orders\",http_status_code=~\"2..\"}[24h]))",
           "legendFormat": "Criadas",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\",http_status_code=~\"2..\"}[24h]))",
-          "legendFormat": "Finalizadas",
+          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[24h]))",
+          "legendFormat": "Aprovadas",
           "refId": "B"
         }
       ]

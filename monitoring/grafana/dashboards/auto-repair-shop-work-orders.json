@@ -9,28 +9,28 @@
   "panels": [
     {
       "id": 1,
-      "title": "Tempo Médio de Execução por Status",
-      "description": "Tempo médio que ordens de serviço permanecem em cada status (Diagnóstico, Execução, Finalização)",
+      "title": "Latência Média por Operação de Ordem de Serviço",
+      "description": "Latência média (p95) para criação, atualização e aprovação de ordens de serviço",
       "type": "barchart",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*DIAGNOSIS.*\"})",
-          "legendFormat": "Diagnóstico",
+          "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket{http_method=\"POST\",http_route=\"/api/work-orders\"}[5m])) by (le))",
+          "legendFormat": "Criação",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*IN_PROGRESS.*\"})",
-          "legendFormat": "Execução",
+          "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket{http_method=\"PATCH\",http_route=\"/api/work-orders/:id\"}[5m])) by (le))",
+          "legendFormat": "Atualização",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg(auto_repair_shop_http_server_request_duration_milliseconds_sum{http_route=~\".*work-order.*status.*DONE.*\"}) / avg(auto_repair_shop_http_server_request_count_total{http_route=~\".*work-order.*status.*DONE.*\"})",
-          "legendFormat": "Finalização",
+          "expr": "histogram_quantile(0.95, sum(rate(auto_repair_shop_http_server_request_duration_milliseconds_bucket{http_method=\"POST\",http_route=\"/api/work-orders/:id/approve\"}[5m])) by (le))",
+          "legendFormat": "Aprovação",
           "refId": "C"
         }
       ],
@@ -53,8 +53,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"PATCH\",http_route=~\".*work-order.*status.*DONE.*\"}[1d]))",
-          "legendFormat": "Finalizadas",
+          "expr": "sum(increase(auto_repair_shop_http_server_request_count_total{http_method=\"POST\",http_route=~\".*/approve\",http_status_code=~\"2..\"}[1d]))",
+          "legendFormat": "Aprovadas",
           "refId": "B"
         }
       ],
